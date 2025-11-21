@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.humberto.gestorfinanceiro.data.settings.SettingsManager
 import com.humberto.gestorfinanceiro.ui.home.DebugScreen
 import com.humberto.gestorfinanceiro.ui.home.HomeScreen
 import com.humberto.gestorfinanceiro.ui.metas.MetasScreen
@@ -30,6 +31,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Inicializar SettingsManager
+        SettingsManager.initialize(this)
         
         checkPermissions()
         

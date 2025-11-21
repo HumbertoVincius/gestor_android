@@ -4,24 +4,24 @@
             "outputFile": "com.humberto.gestorfinanceiro.app-mergeDebugResources-43:/values-kk/values-kk.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\humbe\\.gradle\\caches\\9.0-milestone-1\\transforms\\38d96f97f192473de128ddf91813a185\\transformed\\browser-1.7.0\\res\\values-kk\\values-kk.xml",
+                    "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\caches\\9.0-milestone-1\\transforms\\d221b0857548717541d0d5309eb3f0b5\\transformed\\core-1.12.0\\res\\values-kk\\values-kk.xml",
                     "from": {
-                        "startLines": "2,3,4,5",
-                        "startColumns": "4,4,4,4",
-                        "startOffsets": "55,155,259,367",
-                        "endColumns": "99,103,107,104",
-                        "endOffsets": "150,254,362,467"
+                        "startLines": "2,3,4,5,6,7,8,9",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,150,252,354,457,561,658,769",
+                        "endColumns": "94,101,101,102,103,96,110,100",
+                        "endOffsets": "145,247,349,452,556,653,764,865"
                     },
                     "to": {
-                        "startLines": "16,53,54,55",
-                        "startColumns": "4,4,4,4",
-                        "startOffsets": "1521,5582,5686,5794",
-                        "endColumns": "99,103,107,104",
-                        "endOffsets": "1616,5681,5789,5894"
+                        "startLines": "6,7,8,9,10,11,12,67",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "556,651,753,855,958,1062,1159,6785",
+                        "endColumns": "94,101,101,102,103,96,110,100",
+                        "endOffsets": "646,748,850,953,1057,1154,1265,6881"
                     }
                 },
                 {
-                    "source": "C:\\Users\\humbe\\.gradle\\caches\\9.0-milestone-1\\transforms\\f743e4e286d2c97bfaf2d013afbf8a2f\\transformed\\jetified-ui-release\\res\\values-kk\\values-kk.xml",
+                    "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\caches\\9.0-milestone-1\\transforms\\d25bd1899ed33854c8a260d5af56c687\\transformed\\jetified-ui-release\\res\\values-kk\\values-kk.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -38,7 +38,24 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\humbe\\.gradle\\caches\\9.0-milestone-1\\transforms\\4376104504e4e1bde7f1a999ede71306\\transformed\\jetified-material3-1.1.1\\res\\values-kk\\values-kk.xml",
+                    "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\caches\\9.0-milestone-1\\transforms\\38d96f97f192473de128ddf91813a185\\transformed\\browser-1.7.0\\res\\values-kk\\values-kk.xml",
+                    "from": {
+                        "startLines": "2,3,4,5",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "55,155,259,367",
+                        "endColumns": "99,103,107,104",
+                        "endOffsets": "150,254,362,467"
+                    },
+                    "to": {
+                        "startLines": "16,53,54,55",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "1521,5582,5686,5794",
+                        "endColumns": "99,103,107,104",
+                        "endOffsets": "1616,5681,5789,5894"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\caches\\9.0-milestone-1\\transforms\\71e06861589e6a1ee0ac3e296402dc8e\\transformed\\jetified-material3-1.1.2\\res\\values-kk\\values-kk.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -52,23 +69,6 @@
                         "startOffsets": "105,219,333,444,1446,1621,1718,1833,1967,2088,2209,2289,2383,2473,2566,2678,2798,2902,3040,3176,3304,3459,3578,3689,3805,3917,4004,4098,4217,4348,4448,4555,4657,4791,4932,5036,5338,5507,6550,6705,6886,7250,7335,7416,7513,7613,7706,7798,7881,7981,8076,8169,8302,8388,8495",
                         "endColumns": "113,113,110,111,74,96,114,133,120,120,79,93,89,92,111,119,103,137,135,127,154,118,110,115,111,86,93,118,130,99,106,101,133,140,103,94,81,74,81,79,99,84,80,96,99,92,91,82,99,94,92,132,85,106,96",
                         "endOffsets": "214,328,439,551,1516,1713,1828,1962,2083,2204,2284,2378,2468,2561,2673,2793,2897,3035,3171,3299,3454,3573,3684,3800,3912,3999,4093,4212,4343,4443,4550,4652,4786,4927,5031,5126,5415,5577,6627,6780,6981,7330,7411,7508,7608,7701,7793,7876,7976,8071,8164,8297,8383,8490,8587"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\humbe\\.gradle\\caches\\9.0-milestone-1\\transforms\\d221b0857548717541d0d5309eb3f0b5\\transformed\\core-1.12.0\\res\\values-kk\\values-kk.xml",
-                    "from": {
-                        "startLines": "2,3,4,5,6,7,8,9",
-                        "startColumns": "4,4,4,4,4,4,4,4",
-                        "startOffsets": "55,150,252,354,457,561,658,769",
-                        "endColumns": "94,101,101,102,103,96,110,100",
-                        "endOffsets": "145,247,349,452,556,653,764,865"
-                    },
-                    "to": {
-                        "startLines": "6,7,8,9,10,11,12,67",
-                        "startColumns": "4,4,4,4,4,4,4,4",
-                        "startOffsets": "556,651,753,855,958,1062,1159,6785",
-                        "endColumns": "94,101,101,102,103,96,110,100",
-                        "endOffsets": "646,748,850,953,1057,1154,1265,6881"
                     }
                 }
             ]

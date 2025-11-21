@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import com.humberto.gestorfinanceiro.data.settings.SettingsManager
 import com.humberto.gestorfinanceiro.di.Dependencies
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,20 +18,37 @@ class SmsReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
+            // Inicializar SettingsManager se ainda não foi inicializado
+            SettingsManager.initialize(context)
+            
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
             
             val pendingResult = goAsync()
             
             scope.launch(Dispatchers.IO) {
                 try {
+                    // Obter número configurado do remetente
+                    val configuredSenderNumber = SettingsManager.getSmsSenderNumber()
+                    
                     messages?.forEach { sms ->
                         val sender = sms.originatingAddress
                         val body = sms.messageBody
                         
                         Log.d("SmsReceiver", "SMS received from $sender: $body")
                         
-                        // TODO: Add logic to filter by specific bank number if needed
-                        // if (sender == "YOUR_BANK_NUMBER") { ... }
+                        // Filtrar por número do remetente se configurado
+                        if (configuredSenderNumber != null && configuredSenderNumber.isNotBlank()) {
+                            // Normalizar números para comparação (remover espaços, caracteres especiais)
+                            val normalizedSender = sender?.replace(Regex("[^0-9]"), "")
+                            val normalizedConfigured = configuredSenderNumber.replace(Regex("[^0-9]"), "")
+                            
+                            if (normalizedSender != normalizedConfigured) {
+                                Log.d("SmsReceiver", "SMS ignorado: remetente $sender não corresponde ao número configurado ($configuredSenderNumber)")
+                                return@forEach
+                            }
+                            
+                            Log.d("SmsReceiver", "SMS aceito: remetente corresponde ao número configurado")
+                        }
 
                         val expense = Dependencies.llmService.parseSms(body)
                         if (expense != null) {

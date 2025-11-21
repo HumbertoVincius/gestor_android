@@ -4,7 +4,54 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    
+    <!-- Fundo azul escuro -->
     <path
-        android:fillColor="#BB86FC"
-        android:pathData="M54,54m-25,0a25,25 0 1,1 50,0a25,25 0 1,1 -50,0"/>
+        android:fillColor="#1A233B"
+        android:pathData="M0,0h108v108h-108z"/>
+    
+    <!-- Escudo azul com gradiente -->
+    <group
+        android:translateX="54"
+        android:translateY="40">
+        <!-- Escudo principal -->
+        <path
+            android:fillColor="#3F51B5"
+            android:pathData="M-20,-25 Q-20,-30 -15,-30 L15,-30 Q20,-30 20,-25 L20,15 Q20,20 15,20 L10,20 L10,25 L-10,25 L-10,20 L-15,20 Q-20,20 -20,15 Z"/>
+        
+        <!-- Gradiente interno do escudo -->
+        <path
+            android:fillColor="#5C6BC0"
+            android:pathData="M-15,-25 Q-15,-28 -10,-28 L10,-28 Q15,-28 15,-25 L15,12 Q15,15 10,15 L-10,15 Q-15,15 -15,12 Z"/>
+    </group>
+    
+    <!-- Chave dourada sobreposta ao escudo -->
+    <group
+        android:translateX="54"
+        android:translateY="35">
+        <!-- Cabeça da chave (círculo) -->
+        <path
+            android:fillColor="#FFC107"
+            android:pathData="M-8,-28m-6,0a6,6 0 1,1 12,0a6,6 0 1,1 -12,0"/>
+        
+        <!-- Círculo interno da chave -->
+        <path
+            android:fillColor="#FFD54F"
+            android:pathData="M-8,-28m-4,0a4,4 0 1,1 8,0a4,4 0 1,1 -8,0"/>
+        
+        <!-- Haste da chave -->
+        <path
+            android:fillColor="#FFC107"
+            android:pathData="M-8,-22 L-8,8 L8,8 L8,5 L-5,5 L-5,-22 Z"/>
+        
+        <!-- Dentes da chave -->
+        <path
+            android:fillColor="#FFC107"
+            android:pathData="M8,5 L8,8 L12,8 L12,12 L16,12 L16,8 L12,8 L12,5 Z"/>
+        
+        <!-- Gradiente na chave -->
+        <path
+            android:fillColor="#FFD54F"
+            android:pathData="M-6,-20 L-6,6 L6,6 L6,4 L-4,4 L-4,-20 Z"/>
+    </group>
 </vector>

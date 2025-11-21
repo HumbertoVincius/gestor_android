@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.runtime.*
@@ -166,6 +167,7 @@ fun MetasScreen() {
     LaunchedEffect(selectedMonth, selectedYear) {
         loadData()
     }
+    
 
     // Agrupar despesas por categoria
     val expensesByCategory = remember(expenses) {
@@ -266,6 +268,11 @@ fun MetasScreen() {
                             }
                         ) {
                             Icon(Icons.Default.ArrowForward, contentDescription = "Próximo mês")
+                        }
+                        IconButton(
+                            onClick = { loadData() }
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Atualizar")
                         }
                         MetasSortOrderSelector(
                             currentSort = sortOrder,

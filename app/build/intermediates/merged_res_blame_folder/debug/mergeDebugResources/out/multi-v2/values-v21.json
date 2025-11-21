@@ -4,7 +4,7 @@
             "outputFile": "com.humberto.gestorfinanceiro.app-mergeDebugResources-43:/values-v21/values-v21.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\humbe\\.gradle\\caches\\9.0-milestone-1\\transforms\\d221b0857548717541d0d5309eb3f0b5\\transformed\\core-1.12.0\\res\\values-v21\\values-v21.xml",
+                    "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\caches\\9.0-milestone-1\\transforms\\d221b0857548717541d0d5309eb3f0b5\\transformed\\core-1.12.0\\res\\values-v21\\values-v21.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,13",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4",

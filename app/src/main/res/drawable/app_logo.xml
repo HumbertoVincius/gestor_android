@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+    
+    <!-- Fundo azul escuro -->
+    <path
+        android:fillColor="#1A233B"
+        android:pathData="M0,0h200v200h-200z"/>
+    
+    <!-- Escudo azul -->
+    <group
+        android:translateX="100"
+        android:translateY="75">
+        <!-- Escudo principal -->
+        <path
+            android:fillColor="#3F51B5"
+            android:pathData="M-40,-50 Q-40,-60 -30,-60 L30,-60 Q40,-60 40,-50 L40,30 Q40,40 30,40 L20,40 L20,50 L-20,50 L-20,40 L-30,40 Q-40,40 -40,30 Z"/>
+        
+        <!-- Gradiente interno do escudo -->
+        <path
+            android:fillColor="#5C6BC0"
+            android:pathData="M-30,-50 Q-30,-56 -20,-56 L20,-56 Q30,-56 30,-50 L30,24 Q30,30 20,30 L-20,30 Q-30,30 -30,24 Z"/>
+    </group>
+    
+    <!-- Chave dourada sobreposta ao escudo -->
+    <group
+        android:translateX="100"
+        android:translateY="70">
+        <!-- Cabeça da chave (círculo) -->
+        <path
+            android:fillColor="#FFC107"
+            android:pathData="M-16,-56m-12,0a12,12 0 1,1 24,0a12,12 0 1,1 -24,0"/>
+        
+        <!-- Círculo interno da chave -->
+        <path
+            android:fillColor="#FFD54F"
+            android:pathData="M-16,-56m-8,0a8,8 0 1,1 16,0a8,8 0 1,1 -16,0"/>
+        
+        <!-- Haste da chave -->
+        <path
+            android:fillColor="#FFC107"
+            android:pathData="M-16,-44 L-16,16 L16,16 L16,10 L-10,10 L-10,-44 Z"/>
+        
+        <!-- Dentes da chave -->
+        <path
+            android:fillColor="#FFC107"
+            android:pathData="M16,10 L16,16 L24,16 L24,24 L32,24 L32,16 L24,16 L24,10 Z"/>
+        
+        <!-- Gradiente na chave -->
+        <path
+            android:fillColor="#FFD54F"
+            android:pathData="M-12,-40 L-12,12 L12,12 L12,8 L-8,8 L-8,-40 Z"/>
+    </group>
+</vector>
