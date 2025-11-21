@@ -1,21 +1,22 @@
 package com.humberto.gestorfinanceiro.data.supabase
 
-import com.humberto.gestorfinanceiro.data.llm.Transaction
+import android.util.Log
+import com.humberto.gestorfinanceiro.data.model.Expense
+import com.humberto.gestorfinanceiro.data.model.Goal
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.Serializable
+import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 
-@Serializable
-data class TransactionDto(
-    val amount: Double,
-    val merchant: String,
-    val date: Long,
-    val category: String,
-    val original_sms: String
+data class ConnectionTestResult(
+    val success: Boolean,
+    val message: String,
+    val details: List<String> = emptyList(),
+    val expensesFound: Int = 0
 )
 
 class SupabaseRepository(
@@ -28,29 +29,309 @@ class SupabaseRepository(
     ) {
         install(Postgrest)
     }
+    
+    companion object {
+        private const val TAG = "SupabaseRepository"
+    }
 
-    suspend fun saveTransaction(transaction: Transaction) = withContext(Dispatchers.IO) {
+    suspend fun saveExpense(expense: Expense) = withContext(Dispatchers.IO) {
         try {
-            val dto = TransactionDto(
-                amount = transaction.amount,
-                merchant = transaction.merchant,
-                date = transaction.date,
-                category = transaction.category,
-                original_sms = transaction.originalSms
-            )
-            client.postgrest["transactions"].insert(dto)
+            Log.d(TAG, "Salvando despesa: $expense")
+            client.postgrest["despesas"].insert(expense)
+            Log.d(TAG, "Despesa salva com sucesso")
         } catch (e: Exception) {
+            Log.e(TAG, "Erro ao salvar despesa", e)
             e.printStackTrace()
             throw e
         }
     }
     
-    suspend fun getTransactions(): List<TransactionDto> = withContext(Dispatchers.IO) {
+    suspend fun getExpenses(month: Int, year: Int): List<Expense> = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["transactions"].select().decodeList<TransactionDto>()
+            // Format: YYYY-MM
+            val filter = "%d-%02d".format(year, month)
+            Log.d(TAG, "Buscando despesas para $filter")
+            val result = client.postgrest["despesas"]
+                .select {
+                    filter {
+                        like("data_competencia", "$filter%")
+                    }
+                }
+                .decodeList<Expense>()
+            Log.d(TAG, "Despesas encontradas para $filter: ${result.size}")
+            result
         } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar despesas filtradas", e)
             e.printStackTrace()
             emptyList()
+        }
+    }
+    
+    suspend fun getAllExpenses(): List<Expense> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "=== INICIANDO BUSCA DE DESPESAS ===")
+            Log.d(TAG, "Supabase URL: $supabaseUrl")
+            Log.d(TAG, "Supabase Key (primeiros 10 chars): ${supabaseKey.take(10)}...")
+            Log.d(TAG, "Buscando despesas da tabela 'despesas'...")
+            
+            val query = client.postgrest["despesas"].select()
+            Log.d(TAG, "Query criada com sucesso")
+            
+            val result = query.decodeList<Expense>()
+            Log.d(TAG, "Despesas decodificadas: ${result.size}")
+            
+            if (result.isNotEmpty()) {
+                Log.d(TAG, "Primeira despesa encontrada:")
+                Log.d(TAG, "  - ID: ${result.first().id}")
+                Log.d(TAG, "  - Estabelecimento: ${result.first().estabelecimento}")
+                Log.d(TAG, "  - Valor: ${result.first().valor}")
+                Log.d(TAG, "  - Data: ${result.first().dataCompetencia}")
+                Log.d(TAG, "  - Categoria: ${result.first().categoria}")
+            } else {
+                Log.w(TAG, "Nenhuma despesa encontrada na resposta")
+                Log.w(TAG, "Possíveis causas:")
+                Log.w(TAG, "  1. RLS não está habilitado na tabela (apenas ter a política não basta)")
+                Log.w(TAG, "  2. Tabela vazia")
+                Log.w(TAG, "  3. Erro na decodificação dos dados")
+                Log.w(TAG, "  4. Verifique no Supabase: Authentication > Policies > Enable RLS na tabela")
+            }
+            
+            Log.d(TAG, "=== BUSCA CONCLUÍDA COM SUCESSO ===")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "=== ERRO AO BUSCAR DESPESAS ===")
+            Log.e(TAG, "Mensagem do erro: ${e.message}")
+            Log.e(TAG, "Tipo do erro: ${e.javaClass.name}")
+            Log.e(TAG, "Causa: ${e.cause?.message}")
+            
+            // Log detalhado do stack trace
+            val stackTrace = e.stackTraceToString()
+            Log.e(TAG, "Stack trace completo:\n$stackTrace")
+            
+            // Verificar tipo específico de erro
+            when {
+                e.message?.contains("HTTP", ignoreCase = true) == true -> {
+                    Log.e(TAG, "ERRO HTTP detectado. Verifique:")
+                    Log.e(TAG, "  1. URL do Supabase está correta?")
+                    Log.e(TAG, "  2. Anon key está correta?")
+                    Log.e(TAG, "  3. RLS está configurado para permitir SELECT?")
+                }
+                e.message?.contains("404", ignoreCase = true) == true -> {
+                    Log.e(TAG, "ERRO 404: Tabela 'despesas' não encontrada")
+                    Log.e(TAG, "Verifique se o nome da tabela está correto no Supabase")
+                }
+                e.message?.contains("permission", ignoreCase = true) == true -> {
+                    Log.e(TAG, "ERRO DE PERMISSÃO: RLS bloqueando acesso")
+                    Log.e(TAG, "Configure uma política RLS para permitir SELECT com anon key")
+                }
+                e.message?.contains("decode", ignoreCase = true) == true -> {
+                    Log.e(TAG, "ERRO DE DECODIFICAÇÃO: Problema ao converter dados")
+                    Log.e(TAG, "Verifique se o modelo Expense corresponde à estrutura da tabela")
+                }
+                else -> {
+                    Log.e(TAG, "Verifique:")
+                    Log.e(TAG, "  1. Conexão com internet")
+                    Log.e(TAG, "  2. URL e chave do Supabase")
+                    Log.e(TAG, "  3. RLS configurado corretamente")
+                    Log.e(TAG, "  4. Nome da tabela: 'despesas'")
+                }
+            }
+            
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    suspend fun getGoals(): List<Goal> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Buscando metas...")
+            val result = client.postgrest["metas"].select().decodeList<Goal>()
+            Log.d(TAG, "Metas encontradas: ${result.size}")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar metas", e)
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+    
+    /**
+     * Função de teste para diagnosticar problemas de conexão
+     * Testa conectividade básica, SSL e acesso ao Supabase
+     */
+    suspend fun testConnection(): ConnectionTestResult = withContext(Dispatchers.IO) {
+        val details = mutableListOf<String>()
+        
+        try {
+            Log.d(TAG, "=== INICIANDO TESTE DE CONEXÃO ===")
+            
+            // Teste 1: Verificar se a URL é válida
+            Log.d(TAG, "Teste 1: Validando URL do Supabase...")
+            try {
+                val url = URL(supabaseUrl)
+                val msg = "✓ URL válida: ${url.protocol}://${url.host}"
+                Log.d(TAG, msg)
+                details.add(msg)
+            } catch (e: Exception) {
+                val msg = "✗ URL inválida: ${e.message}"
+                Log.e(TAG, msg)
+                return@withContext ConnectionTestResult(
+                    success = false,
+                    message = "Erro: URL do Supabase inválida",
+                    details = listOf(msg)
+                )
+            }
+            
+            // Teste 2: Tentar conectar diretamente ao Supabase (teste HTTPS básico)
+            Log.d(TAG, "Teste 2: Testando conexão HTTPS com Supabase...")
+            var httpsSuccess = false
+            var httpsError: String? = null
+            try {
+                val testUrl = "$supabaseUrl/rest/v1/"
+                val url = URL(testUrl)
+                val connection = url.openConnection() as HttpsURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("apikey", supabaseKey)
+                connection.setRequestProperty("Authorization", "Bearer $supabaseKey")
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                
+                val responseCode = connection.responseCode
+                val msg = "✓ Conexão HTTPS estabelecida. Status: $responseCode"
+                Log.d(TAG, msg)
+                details.add(msg)
+                httpsSuccess = true
+                
+                if (responseCode == 200 || responseCode == 404) {
+                    val msg2 = "✓ Servidor Supabase está acessível"
+                    Log.d(TAG, msg2)
+                    details.add(msg2)
+                } else {
+                    val msg2 = "⚠ Status HTTP inesperado: $responseCode"
+                    Log.w(TAG, msg2)
+                    details.add(msg2)
+                }
+                
+                connection.disconnect()
+            } catch (e: Exception) {
+                httpsError = e.message
+                val msg = "✗ Erro ao conectar com Supabase: ${e.message}"
+                Log.e(TAG, msg)
+                Log.e(TAG, "Tipo: ${e.javaClass.name}")
+                details.add(msg)
+                
+                if (e.message?.contains("SSL") == true || e.message?.contains("certificate") == true) {
+                    val msg2 = "⚠ Problema de SSL detectado. Pode ser bloqueio do Android."
+                    Log.e(TAG, msg2)
+                    details.add(msg2)
+                }
+                if (e.message?.contains("timeout") == true) {
+                    val msg2 = "⚠ Timeout detectado. Verifique conexão de internet."
+                    Log.e(TAG, msg2)
+                    details.add(msg2)
+                }
+                if (e.message?.contains("UnknownHostException") == true || e.message?.contains("UnknownHost") == true) {
+                    val msg2 = "⚠ Host não encontrado. Verifique URL do Supabase."
+                    Log.e(TAG, msg2)
+                    details.add(msg2)
+                }
+            }
+            
+            // Teste 3: Testar query simples na tabela despesas
+            Log.d(TAG, "Teste 3: Testando query simples na tabela 'despesas'...")
+            var querySuccess = false
+            var expensesCount = 0
+            var queryError: String? = null
+            
+            try {
+                val result = client.postgrest["despesas"]
+                    .select()
+                    .decodeList<Expense>()
+                
+                expensesCount = result.size
+                val msg = "✓ Query executada com sucesso. Resultados: ${result.size}"
+                Log.d(TAG, msg)
+                details.add(msg)
+                querySuccess = true
+                
+                if (result.isNotEmpty()) {
+                    val msg2 = "✓ Dados retornados corretamente"
+                    Log.d(TAG, msg2)
+                    details.add(msg2)
+                } else {
+                    val msg2 = "⚠ Query retornou vazio (pode ser RLS ou tabela vazia)"
+                    Log.w(TAG, msg2)
+                    details.add(msg2)
+                }
+            } catch (e: Exception) {
+                queryError = e.message
+                val msg = "✗ Erro ao executar query: ${e.message}"
+                Log.e(TAG, msg)
+                Log.e(TAG, "Tipo: ${e.javaClass.name}")
+                details.add(msg)
+                
+                // Análise detalhada do erro
+                when {
+                    e.message?.contains("404") == true -> {
+                        val msg2 = "→ ERRO 404: Tabela 'despesas' não encontrada"
+                        Log.e(TAG, msg2)
+                        details.add(msg2)
+                    }
+                    e.message?.contains("permission") == true || 
+                    e.message?.contains("RLS") == true || 
+                    e.message?.contains("policy") == true -> {
+                        val msg2 = "→ ERRO DE PERMISSÃO: RLS bloqueando"
+                        Log.e(TAG, msg2)
+                        details.add(msg2)
+                    }
+                    e.message?.contains("decode") == true || 
+                    e.message?.contains("serialization") == true -> {
+                        val msg2 = "→ ERRO DE DECODIFICAÇÃO: Modelo não corresponde aos dados"
+                        Log.e(TAG, msg2)
+                        details.add(msg2)
+                    }
+                    e.message?.contains("network") == true || 
+                    e.message?.contains("timeout") == true -> {
+                        val msg2 = "→ ERRO DE REDE: Problema de conectividade"
+                        Log.e(TAG, msg2)
+                        details.add(msg2)
+                    }
+                    else -> {
+                        val msg2 = "→ ERRO DESCONHECIDO: ${e.message}"
+                        Log.e(TAG, msg2)
+                        details.add(msg2)
+                        e.printStackTrace()
+                    }
+                }
+            }
+            
+            Log.d(TAG, "=== TESTE DE CONEXÃO CONCLUÍDO ===")
+            
+            // Determinar resultado final
+            val success = querySuccess && expensesCount > 0
+            val message = when {
+                querySuccess && expensesCount > 0 -> "✓ Conexão realizada com sucesso! Encontradas $expensesCount despesa(s)."
+                querySuccess && expensesCount == 0 -> "✓ Conexão realizada com sucesso, mas nenhuma despesa foi retornada. Verifique RLS ou se há dados na tabela."
+                !httpsSuccess -> "✗ Erro ao conectar com o servidor Supabase: ${httpsError ?: "Erro desconhecido"}"
+                else -> "✗ Erro ao buscar despesas: ${queryError ?: "Erro desconhecido"}"
+            }
+            
+            ConnectionTestResult(
+                success = success,
+                message = message,
+                details = details,
+                expensesFound = expensesCount
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "=== ERRO CRÍTICO NO TESTE ===")
+            Log.e(TAG, "Erro: ${e.message}")
+            e.printStackTrace()
+            
+            ConnectionTestResult(
+                success = false,
+                message = "Erro crítico: ${e.message ?: "Erro desconhecido"}",
+                details = details + "Erro crítico: ${e.javaClass.simpleName}"
+            )
         }
     }
 }
