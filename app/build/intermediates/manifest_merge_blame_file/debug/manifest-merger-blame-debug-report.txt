@@ -1,0 +1,192 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.humberto.gestorfinanceiro"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+11-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:5:5-106
+11-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:5:22-67
+12    <uses-permission android:name="android.permission.READ_SMS" />
+12-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:6:5-103
+12-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:6:22-64
+13    <uses-permission android:name="android.permission.INTERNET" />
+13-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:7:5-67
+13-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:7:22-64
+14
+15    <uses-feature
+15-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:9:5-88
+16        android:name="android.hardware.telephony"
+16-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:9:19-60
+17        android:required="false" />
+17-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:9:61-85
+18
+19    <permission
+19-->[androidx.core:core:1.12.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\102bb4ca6e8b3e009636483291d8df3f\transformed\core-1.12.0\AndroidManifest.xml:22:5-24:47
+20        android:name="com.humberto.gestorfinanceiro.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+20-->[androidx.core:core:1.12.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\102bb4ca6e8b3e009636483291d8df3f\transformed\core-1.12.0\AndroidManifest.xml:23:9-81
+21        android:protectionLevel="signature" />
+21-->[androidx.core:core:1.12.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\102bb4ca6e8b3e009636483291d8df3f\transformed\core-1.12.0\AndroidManifest.xml:24:9-44
+22
+23    <uses-permission android:name="com.humberto.gestorfinanceiro.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+23-->[androidx.core:core:1.12.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\102bb4ca6e8b3e009636483291d8df3f\transformed\core-1.12.0\AndroidManifest.xml:26:5-97
+23-->[androidx.core:core:1.12.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\102bb4ca6e8b3e009636483291d8df3f\transformed\core-1.12.0\AndroidManifest.xml:26:22-94
+24
+25    <application
+25-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:11:5-41:19
+26        android:allowBackup="true"
+26-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:12:9-35
+27        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+27-->[androidx.core:core:1.12.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\102bb4ca6e8b3e009636483291d8df3f\transformed\core-1.12.0\AndroidManifest.xml:28:18-86
+28        android:dataExtractionRules="@xml/data_extraction_rules"
+28-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:13:9-65
+29        android:debuggable="true"
+30        android:extractNativeLibs="false"
+31        android:fullBackupContent="@xml/backup_rules"
+31-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:14:9-54
+32        android:icon="@mipmap/ic_launcher"
+32-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:15:9-43
+33        android:label="@string/app_name"
+33-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:16:9-41
+34        android:roundIcon="@mipmap/ic_launcher_round"
+34-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:17:9-54
+35        android:supportsRtl="true"
+35-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:18:9-35
+36        android:testOnly="true"
+37        android:theme="@style/Theme.GestorFinanceiro" >
+37-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:19:9-54
+38        <activity
+38-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:21:9-31:20
+39            android:name="com.humberto.gestorfinanceiro.MainActivity"
+39-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:22:13-41
+40            android:exported="true"
+40-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:23:13-36
+41            android:theme="@style/Theme.GestorFinanceiro"
+41-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:25:13-58
+42            android:windowSoftInputMode="adjustResize" >
+42-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:24:13-55
+43            <intent-filter>
+43-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:26:13-30:29
+44                <action android:name="android.intent.action.MAIN" />
+44-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:27:17-69
+44-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:27:25-66
+45
+46                <category android:name="android.intent.category.LAUNCHER" />
+46-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:29:17-77
+46-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:29:27-74
+47            </intent-filter>
+48        </activity>
+49
+50        <receiver
+50-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:33:9-40:20
+51            android:name="com.humberto.gestorfinanceiro.domain.sms.SmsReceiver"
+51-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:34:13-51
+52            android:exported="true"
+52-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:35:13-36
+53            android:permission="android.permission.BROADCAST_SMS" >
+53-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:36:13-66
+54            <intent-filter>
+54-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:37:13-39:29
+55                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+55-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:38:17-82
+55-->C:\Users\humbe\dev\gestor_android\app\src\main\AndroidManifest.xml:38:25-79
+56            </intent-filter>
+57        </receiver>
+58
+59        <activity
+59-->[androidx.compose.ui:ui-test-manifest:1.5.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\91f0476b3fb8ecb4e6c80f0ff9b4aae0\transformed\jetified-ui-test-manifest-1.5.0\AndroidManifest.xml:23:9-25:39
+60            android:name="androidx.activity.ComponentActivity"
+60-->[androidx.compose.ui:ui-test-manifest:1.5.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\91f0476b3fb8ecb4e6c80f0ff9b4aae0\transformed\jetified-ui-test-manifest-1.5.0\AndroidManifest.xml:24:13-63
+61            android:exported="true" />
+61-->[androidx.compose.ui:ui-test-manifest:1.5.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\91f0476b3fb8ecb4e6c80f0ff9b4aae0\transformed\jetified-ui-test-manifest-1.5.0\AndroidManifest.xml:25:13-36
+62        <activity
+62-->[androidx.compose.ui:ui-tooling-android:1.5.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\d97a8e8b03678107b092ce4d0c9d3b54\transformed\jetified-ui-tooling-release\AndroidManifest.xml:23:9-25:39
+63            android:name="androidx.compose.ui.tooling.PreviewActivity"
+63-->[androidx.compose.ui:ui-tooling-android:1.5.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\d97a8e8b03678107b092ce4d0c9d3b54\transformed\jetified-ui-tooling-release\AndroidManifest.xml:24:13-71
+64            android:exported="true" />
+64-->[androidx.compose.ui:ui-tooling-android:1.5.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\d97a8e8b03678107b092ce4d0c9d3b54\transformed\jetified-ui-tooling-release\AndroidManifest.xml:25:13-36
+65
+66        <provider
+66-->[io.github.jan-tennert.supabase:gotrue-kt-android-debug:2.0.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\97b9617ddb91f15b96b16c94cbf8fd3c\transformed\jetified-gotrue-kt-debug\AndroidManifest.xml:9:9-17:20
+67            android:name="androidx.startup.InitializationProvider"
+67-->[io.github.jan-tennert.supabase:gotrue-kt-android-debug:2.0.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\97b9617ddb91f15b96b16c94cbf8fd3c\transformed\jetified-gotrue-kt-debug\AndroidManifest.xml:10:13-67
+68            android:authorities="com.humberto.gestorfinanceiro.androidx-startup"
+68-->[io.github.jan-tennert.supabase:gotrue-kt-android-debug:2.0.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\97b9617ddb91f15b96b16c94cbf8fd3c\transformed\jetified-gotrue-kt-debug\AndroidManifest.xml:11:13-68
+69            android:exported="false" >
+69-->[io.github.jan-tennert.supabase:gotrue-kt-android-debug:2.0.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\97b9617ddb91f15b96b16c94cbf8fd3c\transformed\jetified-gotrue-kt-debug\AndroidManifest.xml:12:13-37
+70            <meta-data
+70-->[io.github.jan-tennert.supabase:gotrue-kt-android-debug:2.0.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\97b9617ddb91f15b96b16c94cbf8fd3c\transformed\jetified-gotrue-kt-debug\AndroidManifest.xml:14:13-16:52
+71                android:name="io.github.jan.supabase.gotrue.SupabaseInitializer"
+71-->[io.github.jan-tennert.supabase:gotrue-kt-android-debug:2.0.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\97b9617ddb91f15b96b16c94cbf8fd3c\transformed\jetified-gotrue-kt-debug\AndroidManifest.xml:15:17-81
+72                android:value="androidx.startup" />
+72-->[io.github.jan-tennert.supabase:gotrue-kt-android-debug:2.0.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\97b9617ddb91f15b96b16c94cbf8fd3c\transformed\jetified-gotrue-kt-debug\AndroidManifest.xml:16:17-49
+73            <meta-data
+73-->[androidx.emoji2:emoji2:1.4.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\b7c3ae85520ada1ee35aecb60f939bca\transformed\jetified-emoji2-1.4.0\AndroidManifest.xml:29:13-31:52
+74                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+74-->[androidx.emoji2:emoji2:1.4.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\b7c3ae85520ada1ee35aecb60f939bca\transformed\jetified-emoji2-1.4.0\AndroidManifest.xml:30:17-75
+75                android:value="androidx.startup" />
+75-->[androidx.emoji2:emoji2:1.4.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\b7c3ae85520ada1ee35aecb60f939bca\transformed\jetified-emoji2-1.4.0\AndroidManifest.xml:31:17-49
+76            <meta-data
+76-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\8866a6b960f771cc1e53da512462582d\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:29:13-31:52
+77                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+77-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\8866a6b960f771cc1e53da512462582d\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:30:17-78
+78                android:value="androidx.startup" />
+78-->[androidx.lifecycle:lifecycle-process:2.7.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\8866a6b960f771cc1e53da512462582d\transformed\jetified-lifecycle-process-2.7.0\AndroidManifest.xml:31:17-49
+79            <meta-data
+79-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:29:13-31:52
+80                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+80-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:30:17-85
+81                android:value="androidx.startup" />
+81-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:31:17-49
+82            <meta-data
+82-->[com.russhwolf:multiplatform-settings-no-arg-android-debug:1.1.1] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\c422066ee522ec3d5fa6b84d36e07303\transformed\jetified-multiplatform-settings-no-arg-debug\AndroidManifest.xml:29:13-31:52
+83                android:name="com.russhwolf.settings.SettingsInitializer"
+83-->[com.russhwolf:multiplatform-settings-no-arg-android-debug:1.1.1] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\c422066ee522ec3d5fa6b84d36e07303\transformed\jetified-multiplatform-settings-no-arg-debug\AndroidManifest.xml:30:17-74
+84                android:value="androidx.startup" />
+84-->[com.russhwolf:multiplatform-settings-no-arg-android-debug:1.1.1] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\c422066ee522ec3d5fa6b84d36e07303\transformed\jetified-multiplatform-settings-no-arg-debug\AndroidManifest.xml:31:17-49
+85        </provider>
+86
+87        <receiver
+87-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:34:9-52:20
+88            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+88-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:35:13-76
+89            android:directBootAware="false"
+89-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:36:13-44
+90            android:enabled="true"
+90-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:37:13-35
+91            android:exported="true"
+91-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:38:13-36
+92            android:permission="android.permission.DUMP" >
+92-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:39:13-57
+93            <intent-filter>
+93-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:40:13-42:29
+94                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+94-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:41:17-91
+94-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:41:25-88
+95            </intent-filter>
+96            <intent-filter>
+96-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:43:13-45:29
+97                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+97-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:44:17-85
+97-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:44:25-82
+98            </intent-filter>
+99            <intent-filter>
+99-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:46:13-48:29
+100                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+100-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:47:17-88
+100-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:47:25-85
+101            </intent-filter>
+102            <intent-filter>
+102-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:49:13-51:29
+103                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+103-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:50:17-95
+103-->[androidx.profileinstaller:profileinstaller:1.3.0] C:\Users\humbe\.gradle\caches\9.0-milestone-1\transforms\95534bd726c5df624a9db169c954d74b\transformed\jetified-profileinstaller-1.3.0\AndroidManifest.xml:50:25-92
+104            </intent-filter>
+105        </receiver>
+106    </application>
+107
+108</manifest>

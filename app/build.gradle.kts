@@ -1,6 +1,17 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.20"
+}
+
+// Lê o arquivo local.properties
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
 }
 
 android {
@@ -18,6 +29,16 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        
+        // Expõe as chaves do local.properties para o app
+        val supabaseUrl = localProperties.getProperty("SUPABASE_URL") ?: ""
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        
+        val supabaseKey = localProperties.getProperty("SUPABASE_KEY") ?: ""
+        buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
+        
+        val geminiApiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
     }
 
     buildTypes {
@@ -29,6 +50,13 @@ android {
             )
         }
     }
+    
+    // O buildFeatures combinado
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -36,11 +64,9 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
-    buildFeatures {
-        compose = true
-    }
+
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.4"
     }
     packaging {
         resources {
@@ -60,19 +86,22 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     
+    // Kotlinx Serialization
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+    
     // Supabase & Ktor
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.0.0")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.0.0")
     implementation("io.ktor:ktor-client-android:2.3.7")
     implementation("io.ktor:ktor-client-core:2.3.7")
     implementation("io.ktor:ktor-client-cio:2.3.7")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     
-    // Generative AI (if we use Gemini directly, otherwise we might use a custom Ktor call)
-    // For now, I'll assume we might use a REST call or the Google AI SDK if requested. 
-    // The user mentioned "codificar o conteudo usando uma llm", I'll add the Google AI SDK just in case.
+    // Generative AI
     implementation("com.google.ai.client.generativeai:generativeai:0.1.2")
 
     testImplementation("junit:junit:4.13.2")

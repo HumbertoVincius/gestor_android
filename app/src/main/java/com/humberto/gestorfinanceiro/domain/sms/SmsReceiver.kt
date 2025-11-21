@@ -32,10 +32,10 @@ class SmsReceiver : BroadcastReceiver() {
                         // TODO: Add logic to filter by specific bank number if needed
                         // if (sender == "YOUR_BANK_NUMBER") { ... }
 
-                        val transaction = Dependencies.llmService.parseSms(body)
-                        if (transaction != null) {
-                            Dependencies.supabaseRepository.saveTransaction(transaction)
-                            Log.d("SmsReceiver", "Transaction saved: $transaction")
+                        val expense = Dependencies.llmService.parseSms(body)
+                        if (expense != null) {
+                            Dependencies.supabaseRepository.saveExpense(expense)
+                            Log.d("SmsReceiver", "Expense saved: $expense")
                         } else {
                             Log.d("SmsReceiver", "Failed to parse SMS")
                         }

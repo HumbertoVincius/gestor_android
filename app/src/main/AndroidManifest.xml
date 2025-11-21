@@ -2,9 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.READ_SMS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -19,7 +21,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.GestorFinanceiro">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -28,7 +30,10 @@
             </intent-filter>
         </activity>
         
-        <receiver android:name=".domain.sms.SmsReceiver" android:exported="true">
+        <receiver 
+            android:name=".domain.sms.SmsReceiver" 
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
             <intent-filter>
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
