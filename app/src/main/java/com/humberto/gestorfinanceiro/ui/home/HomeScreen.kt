@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
@@ -42,6 +43,15 @@ private const val TAG = "HomeScreen"
 
 data class SelectedDate(val year: Int, val month: Int, val day: Int)
 
+fun getMonthYearString(month: Int, year: Int): String {
+    val monthNames = arrayOf(
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    )
+    return "${monthNames[month - 1]} $year"
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen() {
     val calendar = Calendar.getInstance()
@@ -112,45 +122,78 @@ fun HomeScreen() {
         groupExpensesByDay(filteredExpenses)
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { 
+                    Column {
+                        Text("Despesas")
+                        Text(
+                            text = getMonthYearString(selectedMonth, selectedYear),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                },
+                actions = {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = {
+                                if (selectedMonth == 1) {
+                                    selectedMonth = 12
+                                    selectedYear--
+                                } else {
+                                    selectedMonth--
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Mês anterior")
+                        }
+                        IconButton(
+                            onClick = {
+                                if (selectedMonth == 12) {
+                                    selectedMonth = 1
+                                    selectedYear++
+                                } else {
+                                    selectedMonth++
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Default.ArrowForward, contentDescription = "Próximo mês")
+                        }
+                        IconButton(
+                            onClick = { loadExpenses() }
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Atualizar")
+                        }
+                        SortOrderSelector(
+                            currentSort = sortOrder,
+                            onSortChanged = { sortOrder = it }
+                        )
+                    }
+                }
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showCreateDialog = true }
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Adicionar despesa"
+                )
+            }
+        }
+    ) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MonthSelector(
-                    month = selectedMonth,
-                    year = selectedYear,
-                    onPreviousMonth = {
-                        if (selectedMonth == 1) {
-                            selectedMonth = 12
-                            selectedYear--
-                        } else {
-                            selectedMonth--
-                        }
-                    },
-                    onNextMonth = {
-                        if (selectedMonth == 12) {
-                            selectedMonth = 1
-                            selectedYear++
-                        } else {
-                            selectedMonth++
-                        }
-                    }
-                )
-                SortOrderSelector(
-                    currentSort = sortOrder,
-                    onSortChanged = { sortOrder = it }
-                )
-            }
-
             // Campo de busca
             OutlinedTextField(
                 value = searchQuery,
@@ -206,7 +249,8 @@ fun HomeScreen() {
                 }
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     groupedExpenses.forEach { (date, dayExpenses) ->
                         item(key = date) {
@@ -231,19 +275,6 @@ fun HomeScreen() {
                     }
                 }
             }
-        }
-
-        // Botão flutuante de criação
-        FloatingActionButton(
-            onClick = { showCreateDialog = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Adicionar despesa"
-            )
         }
     }
 

@@ -11,6 +11,8 @@ import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URL
+import java.text.Normalizer
+import java.util.Locale
 import javax.net.ssl.HttpsURLConnection
 
 data class ConnectionTestResult(
@@ -261,19 +263,38 @@ class SupabaseRepository(
                 .select()
                 .decodeList<Expense>()
             
-            val categories = result
+            // Normalizar e remover duplicatas case-insensitive
+            val normalizedMap = mutableMapOf<String, String>() // normalized -> original
+            
+            result
                 .mapNotNull { it.categoria }
                 .filter { it.isNotBlank() }
-                .distinct()
-                .sorted()
+                .forEach { category ->
+                    val normalized = normalizeCategory(category)
+                    // Manter a primeira ocorrência (com capitalização original)
+                    if (!normalizedMap.containsKey(normalized)) {
+                        normalizedMap[normalized] = category.trim()
+                    }
+                }
             
-            Log.d(TAG, "Categorias encontradas: ${categories.size}")
+            val categories = normalizedMap.values.toList().sorted()
+            
+            Log.d(TAG, "Categorias encontradas (após normalização): ${categories.size}")
             categories
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao buscar categorias", e)
             e.printStackTrace()
             emptyList()
         }
+    }
+    
+    private fun normalizeCategory(category: String): String {
+        // Remove espaços extras, normaliza acentos e converte para minúsculas
+        val trimmed = category.trim()
+        val normalized = Normalizer.normalize(trimmed, Normalizer.Form.NFD)
+        return normalized.replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+            .lowercase(Locale.getDefault())
+            .replace("\\s+".toRegex(), " ") // Normaliza espaços múltiplos
     }
     
     suspend fun getUniqueSubcategories(category: String?): List<String> = withContext(Dispatchers.IO) {
@@ -291,13 +312,23 @@ class SupabaseRepository(
                 }
                 .decodeList<Expense>()
             
-            val subcategories = result
+            // Normalizar e remover duplicatas case-insensitive
+            val normalizedMap = mutableMapOf<String, String>() // normalized -> original
+            
+            result
                 .mapNotNull { it.subcategoria }
                 .filter { it.isNotBlank() }
-                .distinct()
-                .sorted()
+                .forEach { subcategory ->
+                    val normalized = normalizeCategory(subcategory)
+                    // Manter a primeira ocorrência (com capitalização original)
+                    if (!normalizedMap.containsKey(normalized)) {
+                        normalizedMap[normalized] = subcategory.trim()
+                    }
+                }
             
-            Log.d(TAG, "Subcategorias encontradas: ${subcategories.size}")
+            val subcategories = normalizedMap.values.toList().sorted()
+            
+            Log.d(TAG, "Subcategorias encontradas (após normalização): ${subcategories.size}")
             subcategories
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao buscar subcategorias", e)
