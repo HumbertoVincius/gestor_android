@@ -3,6 +3,7 @@ package com.humberto.gestorfinanceiro.data.supabase
 import android.util.Log
 import com.humberto.gestorfinanceiro.data.model.Expense
 import com.humberto.gestorfinanceiro.data.model.Goal
+import com.humberto.gestorfinanceiro.data.model.SortOrder
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
@@ -152,6 +153,190 @@ class SupabaseRepository(
             Log.e(TAG, "Erro ao buscar metas", e)
             e.printStackTrace()
             emptyList()
+        }
+    }
+    
+    suspend fun getGoalsByMonth(month: Int, year: Int): List<Goal> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Buscando metas para mês $month/$year...")
+            val result = client.postgrest["metas"]
+                .select {
+                    filter {
+                        eq("mes", month.toLong())
+                        eq("ano", year.toLong())
+                    }
+                }
+                .decodeList<Goal>()
+            Log.d(TAG, "Metas encontradas para $month/$year: ${result.size}")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar metas do mês", e)
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+    
+    suspend fun getExpensesByCategoryAndMonth(category: String, month: Int, year: Int): List<Expense> = withContext(Dispatchers.IO) {
+        try {
+            val filter = "%d-%02d".format(year, month)
+            Log.d(TAG, "Buscando despesas para categoria $category no mês $filter...")
+            val query = client.postgrest["despesas"]
+                .select {
+                    filter {
+                        like("data_competencia", "$filter%")
+                        eq("categoria", category)
+                    }
+                }
+            val result = query.decodeList<Expense>()
+            Log.d(TAG, "Despesas encontradas para categoria $category: ${result.size}")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar despesas por categoria", e)
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+    
+    suspend fun updateExpense(expense: Expense): Expense = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Atualizando despesa: $expense")
+            val expenseId = expense.id ?: throw IllegalArgumentException("Expense ID não pode ser null")
+            val result = client.postgrest["despesas"]
+                .update(expense) {
+                    filter {
+                        eq("id", expenseId)
+                    }
+                    select()
+                }
+                .decodeSingle<Expense>()
+            Log.d(TAG, "Despesa atualizada com sucesso: ${result.id}")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao atualizar despesa", e)
+            e.printStackTrace()
+            throw e
+        }
+    }
+    
+    suspend fun getExpensesByMonth(month: Int, year: Int, sortBy: SortOrder): List<Expense> = withContext(Dispatchers.IO) {
+        try {
+            val filter = "%d-%02d".format(year, month)
+            Log.d(TAG, "Buscando despesas para $filter com ordenação: $sortBy")
+            
+            val query = client.postgrest["despesas"]
+                .select {
+                    filter {
+                        like("data_competencia", "$filter%")
+                    }
+                }
+            
+            // Aplicar ordenação
+            val result = query.decodeList<Expense>()
+            
+            // Aplicar ordenação manualmente
+            val finalResult = when (sortBy) {
+                SortOrder.DATE_DESC -> result.sortedWith(compareByDescending<Expense> { it.dataCompetencia })
+                SortOrder.DATE_ASC -> result.sortedWith(compareBy<Expense> { it.dataCompetencia })
+                SortOrder.VALUE_DESC -> result.sortedWith(compareByDescending<Expense> { it.valor ?: 0.0 })
+                SortOrder.VALUE_ASC -> result.sortedWith(compareBy<Expense> { it.valor ?: 0.0 })
+                SortOrder.NAME_ASC -> result.sortedWith(compareBy<Expense> { it.estabelecimento ?: "" })
+                SortOrder.NAME_DESC -> result.sortedWith(compareByDescending<Expense> { it.estabelecimento ?: "" })
+                SortOrder.CATEGORY_ASC -> result.sortedWith(compareBy<Expense> { it.categoria ?: "" })
+                SortOrder.CATEGORY_DESC -> result.sortedWith(compareByDescending<Expense> { it.categoria ?: "" })
+            }
+            
+            Log.d(TAG, "Despesas encontradas para $filter: ${finalResult.size}")
+            finalResult
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar despesas do mês", e)
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+    
+    suspend fun getUniqueCategories(): List<String> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Buscando categorias únicas...")
+            val result = client.postgrest["despesas"]
+                .select()
+                .decodeList<Expense>()
+            
+            val categories = result
+                .mapNotNull { it.categoria }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .sorted()
+            
+            Log.d(TAG, "Categorias encontradas: ${categories.size}")
+            categories
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar categorias", e)
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+    
+    suspend fun getUniqueSubcategories(category: String?): List<String> = withContext(Dispatchers.IO) {
+        try {
+            if (category == null) {
+                return@withContext emptyList()
+            }
+            
+            Log.d(TAG, "Buscando subcategorias únicas para categoria: $category")
+            val result = client.postgrest["despesas"]
+                .select {
+                    filter {
+                        eq("categoria", category)
+                    }
+                }
+                .decodeList<Expense>()
+            
+            val subcategories = result
+                .mapNotNull { it.subcategoria }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .sorted()
+            
+            Log.d(TAG, "Subcategorias encontradas: ${subcategories.size}")
+            subcategories
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar subcategorias", e)
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+    
+    suspend fun createExpense(expense: Expense): Expense = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Criando despesa: $expense")
+            val result = client.postgrest["despesas"]
+                .insert(expense) {
+                    select()
+                }
+                .decodeSingle<Expense>()
+            Log.d(TAG, "Despesa criada com sucesso: ${result.id}")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao criar despesa", e)
+            e.printStackTrace()
+            throw e
+        }
+    }
+    
+    suspend fun deleteExpense(id: String) = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Deletando despesa com ID: $id")
+            client.postgrest["despesas"]
+                .delete {
+                    filter {
+                        eq("id", id)
+                    }
+                }
+            Log.d(TAG, "Despesa deletada com sucesso")
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao deletar despesa", e)
+            e.printStackTrace()
+            throw e
         }
     }
     
