@@ -1011,7 +1011,11 @@ fun EditExpenseDialog(
                             scope.launch {
                                 isSaving = true
                                 try {
-                                    if (selectedCategory == null || selectedSubcategory == null) {
+                                    // Criar cópias locais para smart cast
+                                    val categoria = selectedCategory
+                                    val subcategoria = selectedSubcategory
+                                    
+                                    if (categoria == null || subcategoria == null) {
                                         Log.e(TAG, "Categoria e subcategoria são obrigatórias")
                                         isSaving = false
                                         return@launch
@@ -1026,8 +1030,8 @@ fun EditExpenseDialog(
                                     
                                     // Buscar ID da subcategoria
                                     val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
-                                        selectedCategory,
-                                        selectedSubcategory
+                                        categoria,
+                                        subcategoria
                                     )
                                     
                                     if (subcategoriaId == null) {
@@ -1044,8 +1048,8 @@ fun EditExpenseDialog(
                                         // Campos derivados
                                         dataCompetencia = dataCompetencia,
                                         estabelecimento = estabelecimento.ifBlank { null },
-                                        categoria = selectedCategory,
-                                        subcategoria = selectedSubcategory
+                                        categoria = categoria,
+                                        subcategoria = subcategoria
                                     )
                                     
                                     Dependencies.supabaseRepository.updateExpense(updatedExpense)
