@@ -873,12 +873,7 @@ fun EditExpenseDialog(
         val dateStr = expense.dataCompetencia ?: expense.dataDespesa
         if (dateStr != null) {
             try {
-                val dateStr = expense.dataCompetencia ?: expense.dataDespesa ?: return@remember SelectedDate(
-                    year = calendar.get(Calendar.YEAR),
-                    month = calendar.get(Calendar.MONTH) + 1,
-                    day = calendar.get(Calendar.DAY_OF_MONTH)
-                )
-                val parts = dateString.split("-")
+                val parts = dateStr.split("-")
                 if (parts.size >= 3) {
                     SelectedDate(
                         year = parts[0].toInt(),
