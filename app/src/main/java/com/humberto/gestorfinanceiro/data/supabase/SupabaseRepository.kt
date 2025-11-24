@@ -163,14 +163,28 @@ class SupabaseRepository(
     suspend fun getGoalsByMonth(month: Int, year: Int): List<Goal> = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Buscando metas para mês $month/$year...")
-            val result = client.postgrest["metas"]
-                .select {
-                    filter {
-                        eq("mes", month.toLong())
-                        eq("ano", year.toLong())
-                    }
-                }
+            val filter = "%d-%02d".format(year, month)
+            
+            // Buscar todas as metas
+            val allGoals = client.postgrest["metas"]
+                .select()
                 .decodeList<Goal>()
+            
+            // Buscar categorias para enriquecer
+            val categories = client.postgrest["categoria"]
+                .select()
+                .decodeList<Category>()
+            
+            val categoryMap = categories.associateBy { it.idCategoria }
+            
+            // Enriquecer metas com nome da categoria e filtrar por período
+            val result = allGoals.filter { goal ->
+                goal.dataInicio?.startsWith(filter) == true
+            }.map { goal ->
+                val category = categoryMap[goal.idCategoria]
+                goal.copy(nomeCategoria = category?.nomeCategoria)
+            }
+            
             Log.d(TAG, "Metas encontradas para $month/$year: ${result.size}")
             result
         } catch (e: Exception) {
@@ -228,19 +242,45 @@ class SupabaseRepository(
             val filter = "%d-%02d".format(year, month)
             Log.d(TAG, "Buscando despesas para $filter com ordenação: $sortBy")
             
-            // Buscar todas as despesas e filtrar em memória, pois pode ter data_despesa ou data_competencia
+            // Buscar todas as despesas
             val allExpenses = client.postgrest["despesas"]
                 .select()
                 .decodeList<Expense>()
             
             Log.d(TAG, "Total de despesas no banco: ${allExpenses.size}")
             
-            // Filtrar por mês/ano usando data_despesa ou data_competencia
-            val result = allExpenses.filter { expense ->
-                val dateToCheck = expense.dataDespesa ?: expense.dataCompetencia
+            // Buscar todas as subcategorias e categorias para fazer o enriquecimento
+            val subcategories = client.postgrest["subcategoria"]
+                .select()
+                .decodeList<Subcategory>()
+            
+            val categories = client.postgrest["categoria"]
+                .select()
+                .decodeList<Category>()
+            
+            // Criar mapas para lookup rápido
+            val categoryMap = categories.associateBy { it.idCategoria }
+            val subcategoryMap = subcategories.associateBy { it.idSubcategoria }
+            
+            // Enriquecer despesas com nomes de categoria e subcategoria
+            val enrichedExpenses = allExpenses.map { expense ->
+                val subcategory = subcategoryMap[expense.idSubcategoria]
+                val category = subcategory?.idCategoria?.let { categoryMap[it] }
+                
+                expense.copy(
+                    categoria = category?.nomeCategoria,
+                    subcategoria = subcategory?.nomeSubcategoria,
+                    estabelecimento = expense.local, // Usar 'local' como estabelecimento
+                    dataCompetencia = expense.dataDespesa // Usar data_despesa como data_competencia para compatibilidade
+                )
+            }
+            
+            // Filtrar por mês/ano usando data_despesa
+            val result = enrichedExpenses.filter { expense ->
+                val dateToCheck = expense.dataDespesa
                 val matches = dateToCheck?.startsWith(filter) == true
                 if (matches) {
-                    Log.d(TAG, "Despesa encontrada: ${expense.idDespesa}, data: $dateToCheck")
+                    Log.d(TAG, "Despesa: ${expense.idDespesa}, local: ${expense.local}, cat: ${expense.categoria}, subcat: ${expense.subcategoria}")
                 }
                 matches
             }
@@ -249,12 +289,12 @@ class SupabaseRepository(
             
             // Aplicar ordenação manualmente
             val finalResult = when (sortBy) {
-                SortOrder.DATE_DESC -> result.sortedWith(compareByDescending<Expense> { it.dataCompetencia ?: it.dataDespesa ?: "" })
-                SortOrder.DATE_ASC -> result.sortedWith(compareBy<Expense> { it.dataCompetencia ?: it.dataDespesa ?: "" })
+                SortOrder.DATE_DESC -> result.sortedWith(compareByDescending<Expense> { it.dataDespesa ?: "" })
+                SortOrder.DATE_ASC -> result.sortedWith(compareBy<Expense> { it.dataDespesa ?: "" })
                 SortOrder.VALUE_DESC -> result.sortedWith(compareByDescending<Expense> { it.valor ?: 0.0 })
                 SortOrder.VALUE_ASC -> result.sortedWith(compareBy<Expense> { it.valor ?: 0.0 })
-                SortOrder.NAME_ASC -> result.sortedWith(compareBy<Expense> { it.estabelecimento ?: it.local ?: "" })
-                SortOrder.NAME_DESC -> result.sortedWith(compareByDescending<Expense> { it.estabelecimento ?: it.local ?: "" })
+                SortOrder.NAME_ASC -> result.sortedWith(compareBy<Expense> { it.local ?: "" })
+                SortOrder.NAME_DESC -> result.sortedWith(compareByDescending<Expense> { it.local ?: "" })
                 SortOrder.CATEGORY_ASC -> result.sortedWith(compareBy<Expense> { it.categoria ?: "" })
                 SortOrder.CATEGORY_DESC -> result.sortedWith(compareByDescending<Expense> { it.categoria ?: "" })
             }
@@ -270,12 +310,12 @@ class SupabaseRepository(
     
     suspend fun getCategoriesList(): List<Category> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Buscando categorias da tabela 'categorias'...")
-            val result = client.postgrest["categorias"]
+            Log.d(TAG, "Buscando categorias da tabela 'categoria'...")
+            val result = client.postgrest["categoria"]
                 .select()
                 .decodeList<Category>()
             Log.d(TAG, "Categorias encontradas: ${result.size}")
-            result.sortedBy { it.nome }
+            result.sortedBy { it.nomeCategoria }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao buscar categorias", e)
             emptyList()
@@ -284,8 +324,8 @@ class SupabaseRepository(
 
     suspend fun getSubcategoriesList(categoryId: String? = null): List<Subcategory> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Buscando subcategorias da tabela 'subcategorias'...")
-            val query = client.postgrest["subcategorias"].select {
+            Log.d(TAG, "Buscando subcategorias da tabela 'subcategoria'...")
+            val query = client.postgrest["subcategoria"].select {
                 if (categoryId != null) {
                     filter {
                         eq("id_categoria", categoryId)
@@ -294,7 +334,7 @@ class SupabaseRepository(
             }
             val result = query.decodeList<Subcategory>()
             Log.d(TAG, "Subcategorias encontradas: ${result.size}")
-            result.sortedBy { it.nome }
+            result.sortedBy { it.nomeSubcategoria }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao buscar subcategorias", e)
             emptyList()
@@ -302,7 +342,7 @@ class SupabaseRepository(
     }
 
     suspend fun getUniqueCategories(): List<String> = withContext(Dispatchers.IO) {
-        getCategoriesList().mapNotNull { it.nome }
+        getCategoriesList().mapNotNull { it.nomeCategoria }
     }
     
     suspend fun getUniqueSubcategories(categoryName: String?): List<String> = withContext(Dispatchers.IO) {
@@ -311,14 +351,14 @@ class SupabaseRepository(
         // Encontrar ID da categoria pelo nome
         val categories = getCategoriesList()
         val category = categories.find { 
-            normalizeCategory(it.nome ?: "") == normalizeCategory(categoryName) || it.nome.equals(categoryName, ignoreCase = true) 
+            normalizeCategory(it.nomeCategoria ?: "") == normalizeCategory(categoryName) || it.nomeCategoria.equals(categoryName, ignoreCase = true) 
         }
         
-        if (category?.id == null) {
+        if (category?.idCategoria == null) {
             return@withContext emptyList()
         }
         
-        getSubcategoriesList(category.id).mapNotNull { it.nome }
+        getSubcategoriesList(category.idCategoria).mapNotNull { it.nomeSubcategoria }
     }
     
     private fun normalizeCategory(category: String): String {
@@ -328,6 +368,36 @@ class SupabaseRepository(
         return normalized.replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
             .lowercase(Locale.getDefault())
             .replace("\\s+".toRegex(), " ") // Normaliza espaços múltiplos
+    }
+    
+    suspend fun getSubcategoryIdByName(categoryName: String, subcategoryName: String): String? = withContext(Dispatchers.IO) {
+        try {
+            // Buscar categoria primeiro
+            val categories = getCategoriesList()
+            val category = categories.find { 
+                normalizeCategory(it.nomeCategoria ?: "") == normalizeCategory(categoryName)
+            }
+            
+            if (category?.idCategoria == null) {
+                Log.w(TAG, "Categoria '$categoryName' não encontrada")
+                return@withContext null
+            }
+            
+            // Buscar subcategoria
+            val subcategories = getSubcategoriesList(category.idCategoria)
+            val subcategory = subcategories.find { 
+                normalizeCategory(it.nomeSubcategoria ?: "") == normalizeCategory(subcategoryName)
+            }
+            
+            if (subcategory?.idSubcategoria == null) {
+                Log.w(TAG, "Subcategoria '$subcategoryName' não encontrada para categoria '$categoryName'")
+            }
+            
+            subcategory?.idSubcategoria
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar ID da subcategoria", e)
+            null
+        }
     }
     
     suspend fun createExpense(expense: Expense): Expense = withContext(Dispatchers.IO) {

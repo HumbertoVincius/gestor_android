@@ -180,10 +180,10 @@ fun MetasScreen() {
         
         // Adicionar categorias que têm metas
         goals.forEach { goal ->
-            val category = goal.categoria ?: return@forEach
+            val category = goal.nomeCategoria ?: return@forEach
             val categoryExpenses = expensesByCategory[category] ?: emptyList()
             val total = calculateCategoryTotal(categoryExpenses)
-            val goalValue = goal.valorMeta?.toDouble() ?: 0.0
+            val goalValue = goal.valorMeta ?: 0.0
             val percentage = calculatePercentage(total, goalValue)
             val balance = calculateBalance(goalValue, total)
             
@@ -1011,6 +1011,12 @@ fun EditExpenseDialog(
                             scope.launch {
                                 isSaving = true
                                 try {
+                                    if (selectedCategory == null || selectedSubcategory == null) {
+                                        Log.e(TAG, "Categoria e subcategoria são obrigatórias")
+                                        isSaving = false
+                                        return@launch
+                                    }
+                                    
                                     val valorDouble = valor.toDoubleOrNull() ?: 0.0
                                     val dataCompetencia = "%d-%02d-%02d".format(
                                         selectedDate.year,
@@ -1018,12 +1024,28 @@ fun EditExpenseDialog(
                                         selectedDate.day
                                     )
                                     
+                                    // Buscar ID da subcategoria
+                                    val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
+                                        selectedCategory,
+                                        selectedSubcategory
+                                    )
+                                    
+                                    if (subcategoriaId == null) {
+                                        Log.e(TAG, "Subcategoria não encontrada")
+                                        isSaving = false
+                                        return@launch
+                                    }
+                                    
                                     val updatedExpense = expense.copy(
-                                        estabelecimento = estabelecimento.ifBlank { null },
                                         valor = valorDouble,
+                                        dataDespesa = dataCompetencia,
+                                        local = estabelecimento.ifBlank { null },
+                                        idSubcategoria = subcategoriaId,
+                                        // Campos derivados
                                         dataCompetencia = dataCompetencia,
-                                        categoria = selectedCategory?.let { normalizeText(it) },
-                                        subcategoria = selectedSubcategory?.let { normalizeText(it) }
+                                        estabelecimento = estabelecimento.ifBlank { null },
+                                        categoria = selectedCategory,
+                                        subcategoria = selectedSubcategory
                                     )
                                     
                                     Dependencies.supabaseRepository.updateExpense(updatedExpense)
