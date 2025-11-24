@@ -1,6 +1,8 @@
 package com.humberto.gestorfinanceiro.data.llm
 
+import com.humberto.gestorfinanceiro.data.model.Category
 import com.humberto.gestorfinanceiro.data.model.Expense
+import com.humberto.gestorfinanceiro.data.model.Subcategory
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.android.Android
@@ -20,7 +22,11 @@ import org.json.JSONObject
 import java.util.Calendar
 
 interface LlmService {
-    suspend fun parseSms(smsBody: String): Expense?
+    suspend fun parseSms(
+        smsBody: String,
+        subcategories: List<Subcategory>,
+        categories: List<Category>
+    ): Expense?
 }
 
 @Serializable
@@ -73,21 +79,44 @@ class OpenAILlmService(private val apiKey: String) : LlmService {
         isLenient = true
     }
 
-    override suspend fun parseSms(smsBody: String): Expense? = withContext(Dispatchers.IO) {
+    override suspend fun parseSms(
+        smsBody: String,
+        subcategories: List<Subcategory>,
+        categories: List<Category>
+    ): Expense? = withContext(Dispatchers.IO) {
         try {
+            // Criar mapa de categorias para lookup rápido
+            val categoryMap = categories.associateBy { it.idCategoria }
+            
+            // Construir lista de subcategorias com suas categorias para o prompt
+            val subcategoriesText = subcategories.joinToString("\n") { sub ->
+                val categoryName = categoryMap[sub.idCategoria]?.nomeCategoria ?: "Desconhecida"
+                "  - ID: ${sub.idSubcategoria}, Subcategoria: ${sub.nomeSubcategoria}, Categoria: $categoryName"
+            }
+            
             val prompt = """
                 Extract the following information from this bank SMS and return it as a JSON object matching these fields:
-                - estabelecimento (string, merchant name)
-                - valor (number, amount)
-                - data_competencia (string, format YYYY-MM-DD)
-                - hora (string, HH:MM)
-                - categoria (string, guess based on merchant e.g. Alimentacao, Transporte)
-                - cartao (string, card name if available)
-                - final_cartao (number, last 4 digits if available)
+                - estabelecimento (string, merchant/establishment name)
+                - valor (number, transaction amount)
+                - data_competencia (string, date in format YYYY-MM-DD, use current date if not found)
+                - hora (string, time in format HH:MM, use "00:00" if not found)
+                - id_subcategoria (string UUID, choose the MOST APPROPRIATE subcategory ID from the list below based on the establishment type and transaction context)
+                - cartao (string, card name/brand if available, otherwise null)
+                - final_cartao (number, last 4 digits of card if available, otherwise null)
                 
-                SMS: "$smsBody"
+                AVAILABLE SUBCATEGORIES (choose the best match):
+                $subcategoriesText
                 
-                Return ONLY the JSON object, no additional text.
+                IMPORTANT: 
+                - Analyze the establishment name carefully to determine the best subcategory
+                - Examples: supermarket → "Supermercado", restaurant → "Restaurante", gas station → "Combustivel", pharmacy → "Farmacia"
+                - If unsure, choose the most general subcategory within the appropriate category
+                - ALWAYS include id_subcategoria in your response
+                
+                SMS TEXT TO ANALYZE:
+                "$smsBody"
+                
+                Return ONLY a valid JSON object with the fields above, no additional text or explanation.
             """.trimIndent()
 
             val request = OpenAIRequest(
@@ -95,7 +124,7 @@ class OpenAILlmService(private val apiKey: String) : LlmService {
                 messages = listOf(
                     OpenAIMessage(
                         role = "system",
-                        content = "You are a helpful assistant that extracts information from bank SMS messages and returns JSON. Always return valid JSON only."
+                        content = "You are a financial transaction classifier. Extract transaction details from bank SMS and classify them using the provided subcategory list. Always return valid JSON only."
                     ),
                     OpenAIMessage(
                         role = "user",
@@ -103,7 +132,7 @@ class OpenAILlmService(private val apiKey: String) : LlmService {
                     )
                 ),
                 response_format = OpenAIResponseFormat(type = "json_object"),
-                temperature = 0.3
+                temperature = 0.2  // Lower temperature for more consistent classification
             )
 
             val response: OpenAIResponse = httpClient.post("https://api.openai.com/v1/chat/completions") {
@@ -116,28 +145,53 @@ class OpenAILlmService(private val apiKey: String) : LlmService {
 
             val responseText = response.choices.firstOrNull()?.message?.content ?: return@withContext null
             
-            // Limpar o texto da resposta para extrair apenas o JSON
+            // Parse JSON response
             val jsonString = responseText.trim()
                 .substringAfter("{")
                 .substringBeforeLast("}")
-            val json = JSONObject("{$jsonString}")
+            val jsonObj = JSONObject("{$jsonString}")
             
-            // Calculate current month for 'mes' field
-            val calendar = Calendar.getInstance()
-            val currentMonth = (calendar.get(Calendar.MONTH) + 1).toLong()
+            // Get subcategory ID from response
+            val subcategoriaId = jsonObj.optString("id_subcategoria")
+            
+            // Verify that the subcategory ID is valid
+            val subcategory = subcategories.find { it.idSubcategoria == subcategoriaId }
+            if (subcategory == null) {
+                android.util.Log.w("OpenAILlmService", "Invalid subcategory ID returned by LLM: $subcategoriaId")
+                return@withContext null
+            }
+            
+            // Get category name for the selected subcategory
+            val category = categoryMap[subcategory.idCategoria]
+            
+            // Get date or use current date
+            val dataCompetencia = jsonObj.optString("data_competencia").ifBlank {
+                val calendar = Calendar.getInstance()
+                "%d-%02d-%02d".format(
+                    calendar.get(Calendar.YEAR),
+                    calendar.get(Calendar.MONTH) + 1,
+                    calendar.get(Calendar.DAY_OF_MONTH)
+                )
+            }
 
             Expense(
-                estabelecimento = json.optString("estabelecimento", "Desconhecido"),
-                valor = json.optDouble("valor", 0.0),
-                dataCompetencia = json.optString("data_competencia"),
-                hora = json.optString("hora"),
-                categoria = json.optString("categoria", "Outros"),
-                cartao = json.optString("cartao"),
-                finalCartao = json.optLong("final_cartao"),
-                mes = currentMonth,
-                statusTransacao = "Aprovada" // Default assumption
+                valor = jsonObj.optDouble("valor", 0.0),
+                dataDespesa = dataCompetencia,
+                local = jsonObj.optString("estabelecimento", "Desconhecido"),
+                idSubcategoria = subcategoriaId,
+                // Campos derivados para exibição
+                dataCompetencia = dataCompetencia,
+                estabelecimento = jsonObj.optString("estabelecimento", "Desconhecido"),
+                categoria = category?.nomeCategoria,
+                subcategoria = subcategory.nomeSubcategoria,
+                hora = jsonObj.optString("hora", "00:00"),
+                cartao = jsonObj.optString("cartao").ifBlank { null },
+                finalCartao = jsonObj.optLong("final_cartao", 0).takeIf { it > 0 },
+                statusTransacao = "Aprovada",
+                mes = Calendar.getInstance().get(Calendar.MONTH).toLong() + 1
             )
         } catch (e: Exception) {
+            android.util.Log.e("OpenAILlmService", "Error parsing SMS", e)
             e.printStackTrace()
             null
         }

@@ -50,12 +50,25 @@ class SmsReceiver : BroadcastReceiver() {
                             Log.d("SmsReceiver", "SMS aceito: remetente corresponde ao número configurado")
                         }
 
-                        val expense = Dependencies.llmService.parseSms(body)
+                        // Buscar subcategorias e categorias do banco antes de processar o SMS
+                        Log.d("SmsReceiver", "Buscando subcategorias e categorias do banco...")
+                        val subcategories = Dependencies.supabaseRepository.getSubcategoriesList()
+                        val categories = Dependencies.supabaseRepository.getCategoriesList()
+                        
+                        if (subcategories.isEmpty()) {
+                            Log.w("SmsReceiver", "Nenhuma subcategoria encontrada no banco. SMS não pode ser processado.")
+                            return@forEach
+                        }
+                        
+                        Log.d("SmsReceiver", "Encontradas ${subcategories.size} subcategorias e ${categories.size} categorias")
+                        
+                        // Processar SMS com LLM usando subcategorias reais
+                        val expense = Dependencies.llmService.parseSms(body, subcategories, categories)
                         if (expense != null) {
                             Dependencies.supabaseRepository.saveExpense(expense)
-                            Log.d("SmsReceiver", "Expense saved: $expense")
+                            Log.d("SmsReceiver", "Despesa salva com sucesso: ${expense.estabelecimento} - ${expense.valor} - Subcategoria: ${expense.subcategoria}")
                         } else {
-                            Log.d("SmsReceiver", "Failed to parse SMS")
+                            Log.w("SmsReceiver", "Falha ao processar SMS com LLM")
                         }
                     }
                 } catch (e: Exception) {
