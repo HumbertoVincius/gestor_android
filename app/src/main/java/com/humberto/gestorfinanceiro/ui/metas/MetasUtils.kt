@@ -21,10 +21,10 @@ fun groupExpensesBySubcategory(expenses: List<Expense>): Map<String, List<Expens
 }
 
 fun getGoalForCategory(goals: List<Goal>, category: String, month: Int, year: Int): Goal? {
+    val filterDate = "%d-%02d".format(year, month)
     return goals.firstOrNull { 
-        it.categoria == category && 
-        it.mes == month.toLong() && 
-        it.ano == year.toLong() 
+        it.nomeCategoria == category && 
+        it.dataInicio?.startsWith(filterDate) == true
     }
 }
 
