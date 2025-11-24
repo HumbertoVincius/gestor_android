@@ -798,6 +798,12 @@ fun CreateExpenseDialog(
                             scope.launch {
                                 isSaving = true
                                 try {
+                                    if (selectedCategory == null || selectedSubcategory == null) {
+                                        Log.e(TAG, "Categoria e subcategoria são obrigatórias")
+                                        isSaving = false
+                                        return@launch
+                                    }
+                                    
                                     val valorDouble = valor.toDoubleOrNull() ?: 0.0
                                     val dataCompetencia = "%d-%02d-%02d".format(
                                         selectedDate.year,
@@ -805,15 +811,29 @@ fun CreateExpenseDialog(
                                         selectedDate.day
                                     )
                                     
+                                    // Buscar ID da subcategoria
+                                    val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
+                                        selectedCategory,
+                                        selectedSubcategory
+                                    )
+                                    
+                                    if (subcategoriaId == null) {
+                                        Log.e(TAG, "Subcategoria não encontrada")
+                                        isSaving = false
+                                        return@launch
+                                    }
+                                    
                                     val newExpense = Expense(
                                         valor = valorDouble,
-                                        dataDespesa = dataCompetencia, // Usar data_despesa da tabela
-                                        local = estabelecimento.ifBlank { null }, // Usar 'local' da tabela como estabelecimento
-                                        dataCompetencia = dataCompetencia, // Manter para compatibilidade se houver view
-                                        estabelecimento = estabelecimento.ifBlank { null }, // Manter para compatibilidade
-                                        categoria = selectedCategory?.let { normalizeText(it) },
-                                        subcategoria = selectedSubcategory?.let { normalizeText(it) }
-                                        // Nota: id_subcategoria precisa ser buscado/inserido separadamente se necessário
+                                        dataDespesa = dataCompetencia,
+                                        local = estabelecimento.ifBlank { null },
+                                        detalhe = null, // Será preenchido apenas na edição
+                                        idSubcategoria = subcategoriaId,
+                                        // Campos derivados para exibição
+                                        dataCompetencia = dataCompetencia,
+                                        estabelecimento = estabelecimento.ifBlank { null },
+                                        categoria = selectedCategory,
+                                        subcategoria = selectedSubcategory
                                     )
                                     
                                     Dependencies.supabaseRepository.createExpense(newExpense)
@@ -825,7 +845,8 @@ fun CreateExpenseDialog(
                                 }
                             }
                         },
-                        enabled = !isSaving && valor.isNotBlank() && estabelecimento.isNotBlank()
+                        enabled = !isSaving && valor.isNotBlank() && estabelecimento.isNotBlank() && 
+                                  selectedCategory != null && selectedSubcategory != null
                     ) {
                         if (isSaving) {
                             CircularProgressIndicator(
@@ -1120,6 +1141,12 @@ fun EditExpenseDialog(
                             scope.launch {
                                 isSaving = true
                                 try {
+                                    if (selectedCategory == null || selectedSubcategory == null) {
+                                        Log.e(TAG, "Categoria e subcategoria são obrigatórias")
+                                        isSaving = false
+                                        return@launch
+                                    }
+                                    
                                     val valorDouble = valor.toDoubleOrNull() ?: 0.0
                                     val dataCompetencia = "%d-%02d-%02d".format(
                                         selectedDate.year,
@@ -1127,16 +1154,29 @@ fun EditExpenseDialog(
                                         selectedDate.day
                                     )
                                     
+                                    // Buscar ID da subcategoria
+                                    val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
+                                        selectedCategory,
+                                        selectedSubcategory
+                                    )
+                                    
+                                    if (subcategoriaId == null) {
+                                        Log.e(TAG, "Subcategoria não encontrada")
+                                        isSaving = false
+                                        return@launch
+                                    }
+                                    
                                     val updatedExpense = expense.copy(
-                                        idDespesa = expense.idDespesa, // Preservar ID
                                         valor = valorDouble,
-                                        dataDespesa = dataCompetencia, // Usar data_despesa da tabela
-                                        local = estabelecimento.ifBlank { null }, // Usar 'local' da tabela como estabelecimento
-                                        detalhe = detalhe.ifBlank { null }, // Campo detalhe só na edição
-                                        dataCompetencia = dataCompetencia, // Manter para compatibilidade se houver view
-                                        estabelecimento = estabelecimento.ifBlank { null }, // Manter para compatibilidade
-                                        categoria = selectedCategory?.let { normalizeText(it) },
-                                        subcategoria = selectedSubcategory?.let { normalizeText(it) }
+                                        dataDespesa = dataCompetencia,
+                                        local = estabelecimento.ifBlank { null },
+                                        detalhe = detalhe.ifBlank { null },
+                                        idSubcategoria = subcategoriaId,
+                                        // Campos derivados para exibição
+                                        dataCompetencia = dataCompetencia,
+                                        estabelecimento = estabelecimento.ifBlank { null },
+                                        categoria = selectedCategory,
+                                        subcategoria = selectedSubcategory
                                     )
                                     
                                     Dependencies.supabaseRepository.updateExpense(updatedExpense)

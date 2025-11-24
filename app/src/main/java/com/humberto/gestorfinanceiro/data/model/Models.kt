@@ -28,25 +28,25 @@ data class Expense(
 
 @Serializable
 data class Goal(
-    val id: String? = null,
-    val categoria: String? = null,
-    @SerialName("valor_meta") val valorMeta: Long? = null,
-    val mes: Long? = null,
-    val ano: Long? = null,
-    @SerialName("created_at") val createdAt: String? = null
+    @SerialName("id_meta") val idMeta: String? = null,
+    @SerialName("id_categoria") val idCategoria: String? = null,
+    @SerialName("valor_meta") val valorMeta: Double? = null,
+    val periodo: String? = null,
+    @SerialName("data_inicio") val dataInicio: String? = null,
+    
+    // Campos derivados de JOINs
+    @SerialName("nome_categoria") val nomeCategoria: String? = null
 )
 
 @Serializable
 data class Category(
-    @SerialName("id_categoria") val id: String? = null,
-    val nome: String? = null,
-    val descricao: String? = null
+    @SerialName("id_categoria") val idCategoria: String? = null,
+    @SerialName("nome_categoria") val nomeCategoria: String? = null
 )
 
 @Serializable
 data class Subcategory(
-    @SerialName("id_subcategoria") val id: String? = null,
+    @SerialName("id_subcategoria") val idSubcategoria: String? = null,
     @SerialName("id_categoria") val idCategoria: String? = null,
-    val nome: String? = null,
-    val descricao: String? = null
+    @SerialName("nome_subcategoria") val nomeSubcategoria: String? = null
 )
