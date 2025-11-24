@@ -1,19 +1,7 @@
 [
     {
-        "merged": "com.humberto.gestorfinanceiro.app-debug-45:/drawable_ic_launcher_background.xml.flat",
-        "source": "com.humberto.gestorfinanceiro.app-main-47:/drawable/ic_launcher_background.xml"
-    },
-    {
-        "merged": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-debug-45:\\xml_backup_rules.xml.flat",
-        "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-main-47:\\xml\\backup_rules.xml"
-    },
-    {
-        "merged": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-debug-45:\\mipmap-anydpi-v26_ic_launcher_round.xml.flat",
-        "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-main-47:\\mipmap-anydpi-v26\\ic_launcher_round.xml"
-    },
-    {
-        "merged": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-debug-45:\\mipmap-anydpi-v26_ic_launcher.xml.flat",
-        "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-main-47:\\mipmap-anydpi-v26\\ic_launcher.xml"
+        "merged": "com.humberto.gestorfinanceiro.app-debug-45:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.humberto.gestorfinanceiro.app-main-47:/mipmap-anydpi-v26/ic_launcher.xml"
     },
     {
         "merged": "com.humberto.gestorfinanceiro.app-debug-45:/drawable_app_logo_simple.xml.flat",
@@ -24,27 +12,23 @@
         "source": "com.humberto.gestorfinanceiro.app-main-47:/drawable/ic_launcher_foreground.xml"
     },
     {
-        "merged": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-debug-45:\\xml_data_extraction_rules.xml.flat",
-        "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-main-47:\\xml\\data_extraction_rules.xml"
+        "merged": "com.humberto.gestorfinanceiro.app-debug-45:/xml_backup_rules.xml.flat",
+        "source": "com.humberto.gestorfinanceiro.app-main-47:/xml/backup_rules.xml"
     },
     {
-        "merged": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-debug-45:\\drawable_app_logo_simple.xml.flat",
-        "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-main-47:\\drawable\\app_logo_simple.xml"
+        "merged": "com.humberto.gestorfinanceiro.app-debug-45:/drawable_ic_launcher_background.xml.flat",
+        "source": "com.humberto.gestorfinanceiro.app-main-47:/drawable/ic_launcher_background.xml"
     },
     {
-        "merged": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-debug-45:\\drawable_ic_launcher_background.xml.flat",
-        "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-main-47:\\drawable\\ic_launcher_background.xml"
+        "merged": "com.humberto.gestorfinanceiro.app-debug-45:/xml_data_extraction_rules.xml.flat",
+        "source": "com.humberto.gestorfinanceiro.app-main-47:/xml/data_extraction_rules.xml"
     },
     {
-        "merged": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-debug-45:\\drawable_ic_launcher_foreground.xml.flat",
-        "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-main-47:\\drawable\\ic_launcher_foreground.xml"
+        "merged": "com.humberto.gestorfinanceiro.app-debug-45:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.humberto.gestorfinanceiro.app-main-47:/mipmap-anydpi-v26/ic_launcher_round.xml"
     },
     {
         "merged": "com.humberto.gestorfinanceiro.app-debug-45:/drawable_app_logo.xml.flat",
         "source": "com.humberto.gestorfinanceiro.app-main-47:/drawable/app_logo.xml"
-    },
-    {
-        "merged": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-debug-45:\\drawable_app_logo.xml.flat",
-        "source": "C:\\Users\\HumbertoGonçalves\\.gradle\\daemon\\9.0-milestone-1\\com.humberto.gestorfinanceiro.app-main-47:\\drawable\\app_logo.xml"
     }
 ]
