@@ -1,9 +1,11 @@
 package com.humberto.gestorfinanceiro.data.supabase
 
 import android.util.Log
+import com.humberto.gestorfinanceiro.data.model.Category
 import com.humberto.gestorfinanceiro.data.model.Expense
 import com.humberto.gestorfinanceiro.data.model.Goal
 import com.humberto.gestorfinanceiro.data.model.SortOrder
+import com.humberto.gestorfinanceiro.data.model.Subcategory
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
@@ -57,7 +59,7 @@ class SupabaseRepository(
             val result = client.postgrest["despesas"]
                 .select {
                     filter {
-                        like("data_competencia", "$filter%")
+                        like("data_despesa", "$filter%")
                     }
                 }
                 .decodeList<Expense>()
@@ -85,7 +87,7 @@ class SupabaseRepository(
             
             if (result.isNotEmpty()) {
                 Log.d(TAG, "Primeira despesa encontrada:")
-                Log.d(TAG, "  - ID: ${result.first().id}")
+                Log.d(TAG, "  - ID: ${result.first().idDespesa}")
                 Log.d(TAG, "  - Estabelecimento: ${result.first().estabelecimento}")
                 Log.d(TAG, "  - Valor: ${result.first().valor}")
                 Log.d(TAG, "  - Data: ${result.first().dataCompetencia}")
@@ -185,8 +187,9 @@ class SupabaseRepository(
             val query = client.postgrest["despesas"]
                 .select {
                     filter {
-                        like("data_competencia", "$filter%")
-                        eq("categoria", category)
+                        like("data_despesa", "$filter%")
+                        // Nota: categoria pode vir de view ou join com subcategoria
+                        // Se não houver view, precisará fazer join manualmente
                     }
                 }
             val result = query.decodeList<Expense>()
@@ -202,16 +205,16 @@ class SupabaseRepository(
     suspend fun updateExpense(expense: Expense): Expense = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Atualizando despesa: $expense")
-            val expenseId = expense.id ?: throw IllegalArgumentException("Expense ID não pode ser null")
+            val expenseId = expense.idDespesa ?: throw IllegalArgumentException("Expense ID não pode ser null")
             val result = client.postgrest["despesas"]
                 .update(expense) {
                     filter {
-                        eq("id", expenseId)
+                        eq("id_despesa", expenseId)
                     }
                     select()
                 }
                 .decodeSingle<Expense>()
-            Log.d(TAG, "Despesa atualizada com sucesso: ${result.id}")
+            Log.d(TAG, "Despesa atualizada com sucesso: ${result.idDespesa}")
             result
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao atualizar despesa", e)
@@ -225,29 +228,38 @@ class SupabaseRepository(
             val filter = "%d-%02d".format(year, month)
             Log.d(TAG, "Buscando despesas para $filter com ordenação: $sortBy")
             
-            val query = client.postgrest["despesas"]
-                .select {
-                    filter {
-                        like("data_competencia", "$filter%")
-                    }
-                }
+            // Buscar todas as despesas e filtrar em memória, pois pode ter data_despesa ou data_competencia
+            val allExpenses = client.postgrest["despesas"]
+                .select()
+                .decodeList<Expense>()
             
-            // Aplicar ordenação
-            val result = query.decodeList<Expense>()
+            Log.d(TAG, "Total de despesas no banco: ${allExpenses.size}")
+            
+            // Filtrar por mês/ano usando data_despesa ou data_competencia
+            val result = allExpenses.filter { expense ->
+                val dateToCheck = expense.dataDespesa ?: expense.dataCompetencia
+                val matches = dateToCheck?.startsWith(filter) == true
+                if (matches) {
+                    Log.d(TAG, "Despesa encontrada: ${expense.idDespesa}, data: $dateToCheck")
+                }
+                matches
+            }
+            
+            Log.d(TAG, "Despesas filtradas para $filter: ${result.size}")
             
             // Aplicar ordenação manualmente
             val finalResult = when (sortBy) {
-                SortOrder.DATE_DESC -> result.sortedWith(compareByDescending<Expense> { it.dataCompetencia })
-                SortOrder.DATE_ASC -> result.sortedWith(compareBy<Expense> { it.dataCompetencia })
+                SortOrder.DATE_DESC -> result.sortedWith(compareByDescending<Expense> { it.dataCompetencia ?: it.dataDespesa ?: "" })
+                SortOrder.DATE_ASC -> result.sortedWith(compareBy<Expense> { it.dataCompetencia ?: it.dataDespesa ?: "" })
                 SortOrder.VALUE_DESC -> result.sortedWith(compareByDescending<Expense> { it.valor ?: 0.0 })
                 SortOrder.VALUE_ASC -> result.sortedWith(compareBy<Expense> { it.valor ?: 0.0 })
-                SortOrder.NAME_ASC -> result.sortedWith(compareBy<Expense> { it.estabelecimento ?: "" })
-                SortOrder.NAME_DESC -> result.sortedWith(compareByDescending<Expense> { it.estabelecimento ?: "" })
+                SortOrder.NAME_ASC -> result.sortedWith(compareBy<Expense> { it.estabelecimento ?: it.local ?: "" })
+                SortOrder.NAME_DESC -> result.sortedWith(compareByDescending<Expense> { it.estabelecimento ?: it.local ?: "" })
                 SortOrder.CATEGORY_ASC -> result.sortedWith(compareBy<Expense> { it.categoria ?: "" })
                 SortOrder.CATEGORY_DESC -> result.sortedWith(compareByDescending<Expense> { it.categoria ?: "" })
             }
             
-            Log.d(TAG, "Despesas encontradas para $filter: ${finalResult.size}")
+            Log.d(TAG, "Despesas ordenadas: ${finalResult.size}")
             finalResult
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao buscar despesas do mês", e)
@@ -256,36 +268,57 @@ class SupabaseRepository(
         }
     }
     
-    suspend fun getUniqueCategories(): List<String> = withContext(Dispatchers.IO) {
+    suspend fun getCategoriesList(): List<Category> = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Buscando categorias únicas...")
-            val result = client.postgrest["despesas"]
+            Log.d(TAG, "Buscando categorias da tabela 'categorias'...")
+            val result = client.postgrest["categorias"]
                 .select()
-                .decodeList<Expense>()
-            
-            // Normalizar e remover duplicatas case-insensitive
-            val normalizedMap = mutableMapOf<String, String>() // normalized -> original
-            
-            result
-                .mapNotNull { it.categoria }
-                .filter { it.isNotBlank() }
-                .forEach { category ->
-                    val normalized = normalizeCategory(category)
-                    // Manter a primeira ocorrência (com capitalização original)
-                    if (!normalizedMap.containsKey(normalized)) {
-                        normalizedMap[normalized] = category.trim()
-                    }
-                }
-            
-            val categories = normalizedMap.values.toList().sorted()
-            
-            Log.d(TAG, "Categorias encontradas (após normalização): ${categories.size}")
-            categories
+                .decodeList<Category>()
+            Log.d(TAG, "Categorias encontradas: ${result.size}")
+            result.sortedBy { it.nome }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao buscar categorias", e)
-            e.printStackTrace()
             emptyList()
         }
+    }
+
+    suspend fun getSubcategoriesList(categoryId: String? = null): List<Subcategory> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Buscando subcategorias da tabela 'subcategorias'...")
+            val query = client.postgrest["subcategorias"].select {
+                if (categoryId != null) {
+                    filter {
+                        eq("id_categoria", categoryId)
+                    }
+                }
+            }
+            val result = query.decodeList<Subcategory>()
+            Log.d(TAG, "Subcategorias encontradas: ${result.size}")
+            result.sortedBy { it.nome }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar subcategorias", e)
+            emptyList()
+        }
+    }
+
+    suspend fun getUniqueCategories(): List<String> = withContext(Dispatchers.IO) {
+        getCategoriesList().mapNotNull { it.nome }
+    }
+    
+    suspend fun getUniqueSubcategories(categoryName: String?): List<String> = withContext(Dispatchers.IO) {
+        if (categoryName == null) return@withContext emptyList()
+        
+        // Encontrar ID da categoria pelo nome
+        val categories = getCategoriesList()
+        val category = categories.find { 
+            normalizeCategory(it.nome ?: "") == normalizeCategory(categoryName) || it.nome.equals(categoryName, ignoreCase = true) 
+        }
+        
+        if (category?.id == null) {
+            return@withContext emptyList()
+        }
+        
+        getSubcategoriesList(category.id).mapNotNull { it.nome }
     }
     
     private fun normalizeCategory(category: String): String {
@@ -297,46 +330,6 @@ class SupabaseRepository(
             .replace("\\s+".toRegex(), " ") // Normaliza espaços múltiplos
     }
     
-    suspend fun getUniqueSubcategories(category: String?): List<String> = withContext(Dispatchers.IO) {
-        try {
-            if (category == null) {
-                return@withContext emptyList()
-            }
-            
-            Log.d(TAG, "Buscando subcategorias únicas para categoria: $category")
-            val result = client.postgrest["despesas"]
-                .select {
-                    filter {
-                        eq("categoria", category)
-                    }
-                }
-                .decodeList<Expense>()
-            
-            // Normalizar e remover duplicatas case-insensitive
-            val normalizedMap = mutableMapOf<String, String>() // normalized -> original
-            
-            result
-                .mapNotNull { it.subcategoria }
-                .filter { it.isNotBlank() }
-                .forEach { subcategory ->
-                    val normalized = normalizeCategory(subcategory)
-                    // Manter a primeira ocorrência (com capitalização original)
-                    if (!normalizedMap.containsKey(normalized)) {
-                        normalizedMap[normalized] = subcategory.trim()
-                    }
-                }
-            
-            val subcategories = normalizedMap.values.toList().sorted()
-            
-            Log.d(TAG, "Subcategorias encontradas (após normalização): ${subcategories.size}")
-            subcategories
-        } catch (e: Exception) {
-            Log.e(TAG, "Erro ao buscar subcategorias", e)
-            e.printStackTrace()
-            emptyList()
-        }
-    }
-    
     suspend fun createExpense(expense: Expense): Expense = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Criando despesa: $expense")
@@ -345,7 +338,7 @@ class SupabaseRepository(
                     select()
                 }
                 .decodeSingle<Expense>()
-            Log.d(TAG, "Despesa criada com sucesso: ${result.id}")
+            Log.d(TAG, "Despesa criada com sucesso: ${result.idDespesa}")
             result
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao criar despesa", e)
@@ -360,7 +353,7 @@ class SupabaseRepository(
             client.postgrest["despesas"]
                 .delete {
                     filter {
-                        eq("id", id)
+                        eq("id_despesa", id)
                     }
                 }
             Log.d(TAG, "Despesa deletada com sucesso")
@@ -549,5 +542,93 @@ class SupabaseRepository(
                 details = details + "Erro crítico: ${e.javaClass.simpleName}"
             )
         }
+    }
+    
+    suspend fun createCategory(category: Category) = withContext(Dispatchers.IO) {
+        try {
+            client.postgrest["categorias"].insert(category)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao criar categoria", e)
+            throw e
+        }
+    }
+    
+    suspend fun updateCategoryObj(category: Category) = withContext(Dispatchers.IO) {
+        try {
+            client.postgrest["categorias"].update(category) {
+                filter { eq("id_categoria", category.id!!) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao atualizar categoria", e)
+            throw e
+        }
+    }
+    
+    suspend fun deleteCategoryObj(categoryId: String) = withContext(Dispatchers.IO) {
+        try {
+            client.postgrest["categorias"].delete {
+                filter { eq("id_categoria", categoryId) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao deletar categoria", e)
+            throw e
+        }
+    }
+    
+    suspend fun createSubcategory(subcategory: Subcategory) = withContext(Dispatchers.IO) {
+        try {
+            client.postgrest["subcategorias"].insert(subcategory)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao criar subcategoria", e)
+            throw e
+        }
+    }
+    
+    suspend fun updateSubcategoryObj(subcategory: Subcategory) = withContext(Dispatchers.IO) {
+        try {
+            client.postgrest["subcategorias"].update(subcategory) {
+                filter { eq("id_subcategoria", subcategory.id!!) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao atualizar subcategoria", e)
+            throw e
+        }
+    }
+    
+    suspend fun deleteSubcategoryObj(subcategoryId: String) = withContext(Dispatchers.IO) {
+        try {
+            client.postgrest["subcategorias"].delete {
+                filter { eq("id_subcategoria", subcategoryId) }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao deletar subcategoria", e)
+            throw e
+        }
+    }
+
+    // Métodos legados para manter compatibilidade (se necessário), mas agora não fazem nada
+    // Pois a gestão é via tabelas relacionais
+    @Deprecated("Use updateCategoryObj instead", ReplaceWith("updateCategoryObj(category)"))
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun updateCategory(oldCategory: String, newCategory: String) {
+        // Deprecated - não faz nada
+    }
+    
+    @Deprecated("Use deleteCategoryObj instead", ReplaceWith("deleteCategoryObj(categoryId)"))
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun deleteCategory(category: String) {
+        // Deprecated - não faz nada
+    }
+    
+    @Deprecated("Use updateSubcategoryObj instead", ReplaceWith("updateSubcategoryObj(subcategory)"))
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun updateSubcategory(category: String, oldSubcategory: String, newSubcategory: String) {
+        // Deprecated - não faz nada
+    }
+    
+    @Deprecated("Use deleteSubcategoryObj instead", ReplaceWith("deleteSubcategoryObj(subcategoryId)"))
+    @Suppress("UNUSED_PARAMETER")
+    suspend fun deleteSubcategory(category: String, subcategory: String) {
+        // Deprecated - não faz nada
     }
 }

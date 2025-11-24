@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.humberto.gestorfinanceiro.data.settings.SettingsManager
+import com.humberto.gestorfinanceiro.ui.categories.CategoriesScreen
 import com.humberto.gestorfinanceiro.ui.home.DebugScreen
 import com.humberto.gestorfinanceiro.ui.home.HomeScreen
 import com.humberto.gestorfinanceiro.ui.metas.MetasScreen
@@ -85,6 +86,12 @@ fun MainNavigation() {
                     onClick = { selectedScreen = Screen.METAS }
                 )
                 NavigationBarItem(
+                    icon = { Icon(Icons.Default.Edit, contentDescription = "Categorias") },
+                    label = { Text("Categorias") },
+                    selected = selectedScreen == Screen.CATEGORIES,
+                    onClick = { selectedScreen = Screen.CATEGORIES }
+                )
+                NavigationBarItem(
                     icon = { Icon(Icons.Default.Settings, contentDescription = "Debug") },
                     label = { Text("Debug") },
                     selected = selectedScreen == Screen.DEBUG,
@@ -101,6 +108,7 @@ fun MainNavigation() {
             when (selectedScreen) {
                 Screen.HOME -> HomeScreen()
                 Screen.METAS -> MetasScreen()
+                Screen.CATEGORIES -> CategoriesScreen()
                 Screen.DEBUG -> DebugScreen()
             }
         }
