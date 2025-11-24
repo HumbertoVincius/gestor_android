@@ -103,22 +103,22 @@ fun CategoriesScreen() {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(categories, key = { it.id ?: "" }) { category ->
+                items(categories, key = { it.idCategoria ?: "" }) { category ->
                     CategoryCard(
                         category = category,
-                        isExpanded = expandedCategories.contains(category.id),
+                        isExpanded = expandedCategories.contains(category.idCategoria),
                         onExpandedChange = { expanded ->
                             expandedCategories = if (expanded) {
-                                expandedCategories + (category.id ?: "")
+                                expandedCategories + (category.idCategoria ?: "")
                             } else {
-                                expandedCategories - (category.id ?: "")
+                                expandedCategories - (category.idCategoria ?: "")
                             }
                         },
                         onEditCategory = { editingCategory = category },
                         onDeleteCategory = {
                             scope.launch {
                                 try {
-                                    category.id?.let { id ->
+                                    category.idCategoria?.let { id ->
                                         Dependencies.supabaseRepository.deleteCategoryObj(id)
                                         loadCategories()
                                     }
@@ -137,15 +137,15 @@ fun CategoriesScreen() {
                         onDeleteSubcategory = { sub ->
                             scope.launch {
                                 try {
-                                    sub.id?.let { id ->
+                                    sub.idSubcategoria?.let { id ->
                                         Dependencies.supabaseRepository.deleteSubcategoryObj(id)
                                         // Need to force reload of subcategories in the card.
                                         // Since we don't have a direct way, we can collapse/expand or pass a trigger.
                                         // For now, we'll rely on user interaction or reload categories (which doesn't help much unless card fetches again).
                                         // A simple hack is to toggle expansion.
-                                        expandedCategories = expandedCategories - (category.id ?: "")
+                                        expandedCategories = expandedCategories - (category.idCategoria ?: "")
                                         kotlinx.coroutines.delay(100)
-                                        expandedCategories = expandedCategories + (category.id ?: "")
+                                        expandedCategories = expandedCategories + (category.idCategoria ?: "")
                                     }
                                 } catch (e: Exception) {
                                     // Tratar erro
@@ -178,7 +178,7 @@ fun CategoriesScreen() {
             onSubcategoryAdded = {
                 showAddSubcategoryDialog = false
                 // Reload subcategories by toggling expansion
-                val catId = selectedCategoryForSubcategory?.id
+                val catId = selectedCategoryForSubcategory?.idCategoria
                 selectedCategoryForSubcategory = null
                 if (catId != null) {
                     scope.launch {
@@ -238,12 +238,12 @@ fun CategoryCard(
     var isLoadingSubcategories by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(category.id, isExpanded) {
-        if (isExpanded && category.id != null) {
+    LaunchedEffect(category.idCategoria, isExpanded) {
+        if (isExpanded && category.idCategoria != null) {
             isLoadingSubcategories = true
             scope.launch {
                 try {
-                    subcategories = Dependencies.supabaseRepository.getSubcategoriesList(category.id)
+                    subcategories = Dependencies.supabaseRepository.getSubcategoriesList(category.idCategoria)
                 } catch (e: Exception) {
                     subcategories = emptyList()
                 } finally {
@@ -265,7 +265,7 @@ fun CategoryCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = category.nome ?: "Sem nome",
+                    text = category.nomeCategoria ?: "Sem nome",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -347,7 +347,7 @@ fun SubcategoryItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = subcategory.nome ?: "Sem nome",
+            text = subcategory.nomeSubcategoria ?: "Sem nome",
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f)
         )

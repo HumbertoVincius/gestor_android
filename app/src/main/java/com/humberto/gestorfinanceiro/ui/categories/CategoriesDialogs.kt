@@ -63,7 +63,7 @@ fun AddCategoryDialog(
                                 scope.launch {
                                     isSaving = true
                                     try {
-                                        val newCategory = Category(nome = normalizeText(categoryName))
+                                        val newCategory = Category(nomeCategoria = normalizeText(categoryName))
                                         Dependencies.supabaseRepository.createCategory(newCategory)
                                         onCategoryAdded()
                                     } catch (e: Exception) {
@@ -115,7 +115,7 @@ fun AddSubcategoryDialog(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Categoria: ${category.nome}",
+                    text = "Categoria: ${category.nomeCategoria}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
@@ -143,8 +143,8 @@ fun AddSubcategoryDialog(
                                     isSaving = true
                                     try {
                                         val newSubcategory = Subcategory(
-                                            idCategoria = category.id,
-                                            nome = normalizeText(subcategoryName)
+                                            idCategoria = category.idCategoria,
+                                            nomeSubcategoria = normalizeText(subcategoryName)
                                         )
                                         Dependencies.supabaseRepository.createSubcategory(newSubcategory)
                                         onSubcategoryAdded()
@@ -176,7 +176,7 @@ fun EditCategoryDialog(
     onDismiss: () -> Unit,
     onCategoryUpdated: () -> Unit
 ) {
-    var categoryName by remember { mutableStateOf(category.nome ?: "") }
+    var categoryName by remember { mutableStateOf(category.nomeCategoria ?: "") }
     var isSaving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -215,11 +215,11 @@ fun EditCategoryDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            if (categoryName.isNotBlank() && categoryName != category.nome) {
+                            if (categoryName.isNotBlank() && categoryName != category.nomeCategoria) {
                                 scope.launch {
                                     isSaving = true
                                     try {
-                                        val updatedCategory = category.copy(nome = normalizeText(categoryName))
+                                        val updatedCategory = category.copy(nomeCategoria = normalizeText(categoryName))
                                         Dependencies.supabaseRepository.updateCategoryObj(updatedCategory)
                                         onCategoryUpdated()
                                     } catch (e: Exception) {
@@ -230,7 +230,7 @@ fun EditCategoryDialog(
                                 }
                             }
                         },
-                        enabled = categoryName.isNotBlank() && categoryName != category.nome && !isSaving
+                        enabled = categoryName.isNotBlank() && categoryName != category.nomeCategoria && !isSaving
                     ) {
                         if (isSaving) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp))
@@ -250,7 +250,7 @@ fun EditSubcategoryDialog(
     onDismiss: () -> Unit,
     onSubcategoryUpdated: () -> Unit
 ) {
-    var subcategoryName by remember { mutableStateOf(subcategory.nome ?: "") }
+    var subcategoryName by remember { mutableStateOf(subcategory.nomeSubcategoria ?: "") }
     var isSaving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -289,11 +289,11 @@ fun EditSubcategoryDialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            if (subcategoryName.isNotBlank() && subcategoryName != subcategory.nome) {
+                            if (subcategoryName.isNotBlank() && subcategoryName != subcategory.nomeSubcategoria) {
                                 scope.launch {
                                     isSaving = true
                                     try {
-                                        val updatedSubcategory = subcategory.copy(nome = normalizeText(subcategoryName))
+                                        val updatedSubcategory = subcategory.copy(nomeSubcategoria = normalizeText(subcategoryName))
                                         Dependencies.supabaseRepository.updateSubcategoryObj(updatedSubcategory)
                                         onSubcategoryUpdated()
                                     } catch (e: Exception) {
@@ -304,7 +304,7 @@ fun EditSubcategoryDialog(
                                 }
                             }
                         },
-                        enabled = subcategoryName.isNotBlank() && subcategoryName != subcategory.nome && !isSaving
+                        enabled = subcategoryName.isNotBlank() && subcategoryName != subcategory.nomeSubcategoria && !isSaving
                     ) {
                         if (isSaving) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp))
