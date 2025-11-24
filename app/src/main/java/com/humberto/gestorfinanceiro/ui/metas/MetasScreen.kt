@@ -500,7 +500,7 @@ fun CategoryCard(
                         TransactionItem(
                             expense = expense,
                             onEditClick = { onEditExpense(expense) },
-                            onDeleteClick = { expense.id?.let { onDeleteExpense(it) } }
+                            onDeleteClick = { expense.idDespesa?.let { onDeleteExpense(it) } }
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -583,7 +583,7 @@ fun SubcategoryCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 // Ordenar transações por data (mais recente primeiro)
                 val sortedExpenses = expenses.sortedWith(
-                    compareByDescending<Expense> { it.dataCompetencia ?: "" }
+                    compareByDescending<Expense> { it.dataCompetencia ?: it.dataDespesa ?: "" }
                 )
                 Text(
                     text = "Transações (${sortedExpenses.size}):",
@@ -595,7 +595,7 @@ fun SubcategoryCard(
                     TransactionItem(
                         expense = expense,
                         onEditClick = { onEditExpense(expense) },
-                        onDeleteClick = { expense.id?.let { onDeleteExpense(it) } }
+                        onDeleteClick = { expense.idDespesa?.let { onDeleteExpense(it) } }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -629,7 +629,7 @@ fun TransactionItem(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
-                expense.dataCompetencia?.let { date ->
+                (expense.dataCompetencia ?: expense.dataDespesa)?.let { date ->
                     Text(
                         text = formatTransactionDate(date, expense.hora),
                         style = MaterialTheme.typography.bodySmall,
@@ -760,6 +760,7 @@ fun MetasSortOrderSelector(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun EditExpenseDialog(
     expense: Expense,
     onDismiss: () -> Unit,

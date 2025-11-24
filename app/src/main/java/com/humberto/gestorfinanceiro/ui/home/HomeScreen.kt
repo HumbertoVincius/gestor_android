@@ -261,14 +261,14 @@ fun HomeScreen() {
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
-                        items(dayExpenses, key = { it.id ?: UUID.randomUUID().toString() }) { expense ->
+                        items(dayExpenses, key = { it.idDespesa ?: UUID.randomUUID().toString() }) { expense ->
                             ExpenseListItem(
                                 expense = expense,
                                 onEditClick = {
                                     editingExpense = expense
                                 },
                                 onDeleteClick = { 
-                                    expense.id?.let { id -> deleteExpense(id) }
+                                    expense.idDespesa?.let { id -> deleteExpense(id) }
                                 }
                             )
                         }
@@ -573,6 +573,7 @@ fun SortOrderSelector(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun CreateExpenseDialog(
     onDismiss: () -> Unit,
     onExpenseCreated: () -> Unit,
@@ -805,11 +806,14 @@ fun CreateExpenseDialog(
                                     )
                                     
                                     val newExpense = Expense(
-                                        estabelecimento = estabelecimento.ifBlank { null },
                                         valor = valorDouble,
-                                        dataCompetencia = dataCompetencia,
+                                        dataDespesa = dataCompetencia, // Usar data_despesa da tabela
+                                        local = estabelecimento.ifBlank { null }, // Usar 'local' da tabela como estabelecimento
+                                        dataCompetencia = dataCompetencia, // Manter para compatibilidade se houver view
+                                        estabelecimento = estabelecimento.ifBlank { null }, // Manter para compatibilidade
                                         categoria = selectedCategory?.let { normalizeText(it) },
                                         subcategoria = selectedSubcategory?.let { normalizeText(it) }
+                                        // Nota: id_subcategoria precisa ser buscado/inserido separadamente se necessário
                                     )
                                     
                                     Dependencies.supabaseRepository.createExpense(newExpense)
@@ -854,6 +858,7 @@ fun CreateExpenseDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun EditExpenseDialog(
     expense: Expense,
     onDismiss: () -> Unit,
@@ -864,10 +869,16 @@ fun EditExpenseDialog(
     val calendar = Calendar.getInstance()
     
     // Parse da data atual da despesa
-    val expenseDate = remember(expense.dataCompetencia) {
-        if (expense.dataCompetencia != null) {
+    val expenseDate = remember(expense.dataCompetencia ?: expense.dataDespesa) {
+        val dateStr = expense.dataCompetencia ?: expense.dataDespesa
+        if (dateStr != null) {
             try {
-                val parts = expense.dataCompetencia.split("-")
+                val dateStr = expense.dataCompetencia ?: expense.dataDespesa ?: return@remember SelectedDate(
+                    year = calendar.get(Calendar.YEAR),
+                    month = calendar.get(Calendar.MONTH) + 1,
+                    day = calendar.get(Calendar.DAY_OF_MONTH)
+                )
+                val parts = dateString.split("-")
                 if (parts.size >= 3) {
                     SelectedDate(
                         year = parts[0].toInt(),
@@ -901,7 +912,8 @@ fun EditExpenseDialog(
     var showDatePicker by remember { mutableStateOf(false) }
     
     var valor by remember { mutableStateOf(expense.valor?.toString() ?: "") }
-    var estabelecimento by remember { mutableStateOf(expense.estabelecimento ?: "") }
+    var estabelecimento by remember { mutableStateOf(expense.estabelecimento ?: expense.local ?: "") }
+    var detalhe by remember { mutableStateOf(expense.detalhe ?: "") }
     var selectedCategory by remember { mutableStateOf<String?>(expense.categoria) }
     var selectedSubcategory by remember { mutableStateOf<String?>(expense.subcategoria) }
     
@@ -996,6 +1008,15 @@ fun EditExpenseDialog(
                     label = { Text("Estabelecimento") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = detalhe,
+                    onValueChange = { detalhe = it },
+                    label = { Text("Detalhe") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = false,
+                    maxLines = 3
                 )
 
                 OutlinedTextField(
@@ -1112,9 +1133,13 @@ fun EditExpenseDialog(
                                     )
                                     
                                     val updatedExpense = expense.copy(
-                                        estabelecimento = estabelecimento.ifBlank { null },
+                                        idDespesa = expense.idDespesa, // Preservar ID
                                         valor = valorDouble,
-                                        dataCompetencia = dataCompetencia,
+                                        dataDespesa = dataCompetencia, // Usar data_despesa da tabela
+                                        local = estabelecimento.ifBlank { null }, // Usar 'local' da tabela como estabelecimento
+                                        detalhe = detalhe.ifBlank { null }, // Campo detalhe só na edição
+                                        dataCompetencia = dataCompetencia, // Manter para compatibilidade se houver view
+                                        estabelecimento = estabelecimento.ifBlank { null }, // Manter para compatibilidade
                                         categoria = selectedCategory?.let { normalizeText(it) },
                                         subcategoria = selectedSubcategory?.let { normalizeText(it) }
                                     )
