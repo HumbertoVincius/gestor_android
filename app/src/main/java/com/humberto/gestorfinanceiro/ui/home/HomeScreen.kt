@@ -798,7 +798,11 @@ fun CreateExpenseDialog(
                             scope.launch {
                                 isSaving = true
                                 try {
-                                    if (selectedCategory == null || selectedSubcategory == null) {
+                                    // Criar cópias locais para smart cast
+                                    val categoria = selectedCategory
+                                    val subcategoria = selectedSubcategory
+                                    
+                                    if (categoria == null || subcategoria == null) {
                                         Log.e(TAG, "Categoria e subcategoria são obrigatórias")
                                         isSaving = false
                                         return@launch
@@ -813,8 +817,8 @@ fun CreateExpenseDialog(
                                     
                                     // Buscar ID da subcategoria
                                     val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
-                                        selectedCategory,
-                                        selectedSubcategory
+                                        categoria,
+                                        subcategoria
                                     )
                                     
                                     if (subcategoriaId == null) {
@@ -832,8 +836,8 @@ fun CreateExpenseDialog(
                                         // Campos derivados para exibição
                                         dataCompetencia = dataCompetencia,
                                         estabelecimento = estabelecimento.ifBlank { null },
-                                        categoria = selectedCategory,
-                                        subcategoria = selectedSubcategory
+                                        categoria = categoria,
+                                        subcategoria = subcategoria
                                     )
                                     
                                     Dependencies.supabaseRepository.createExpense(newExpense)
@@ -1141,7 +1145,11 @@ fun EditExpenseDialog(
                             scope.launch {
                                 isSaving = true
                                 try {
-                                    if (selectedCategory == null || selectedSubcategory == null) {
+                                    // Criar cópias locais para smart cast
+                                    val categoria = selectedCategory
+                                    val subcategoria = selectedSubcategory
+                                    
+                                    if (categoria == null || subcategoria == null) {
                                         Log.e(TAG, "Categoria e subcategoria são obrigatórias")
                                         isSaving = false
                                         return@launch
@@ -1156,8 +1164,8 @@ fun EditExpenseDialog(
                                     
                                     // Buscar ID da subcategoria
                                     val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
-                                        selectedCategory,
-                                        selectedSubcategory
+                                        categoria,
+                                        subcategoria
                                     )
                                     
                                     if (subcategoriaId == null) {
@@ -1175,8 +1183,8 @@ fun EditExpenseDialog(
                                         // Campos derivados para exibição
                                         dataCompetencia = dataCompetencia,
                                         estabelecimento = estabelecimento.ifBlank { null },
-                                        categoria = selectedCategory,
-                                        subcategoria = selectedSubcategory
+                                        categoria = categoria,
+                                        subcategoria = subcategoria
                                     )
                                     
                                     Dependencies.supabaseRepository.updateExpense(updatedExpense)
