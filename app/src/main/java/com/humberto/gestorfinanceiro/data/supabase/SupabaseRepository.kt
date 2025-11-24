@@ -616,7 +616,7 @@ class SupabaseRepository(
     
     suspend fun createCategory(category: Category) = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["categorias"].insert(category)
+            client.postgrest["categoria"].insert(category)
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao criar categoria", e)
             throw e
@@ -625,8 +625,8 @@ class SupabaseRepository(
     
     suspend fun updateCategoryObj(category: Category) = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["categorias"].update(category) {
-                filter { eq("id_categoria", category.id!!) }
+            client.postgrest["categoria"].update(category) {
+                filter { eq("id_categoria", category.idCategoria!!) }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao atualizar categoria", e)
@@ -636,7 +636,7 @@ class SupabaseRepository(
     
     suspend fun deleteCategoryObj(categoryId: String) = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["categorias"].delete {
+            client.postgrest["categoria"].delete {
                 filter { eq("id_categoria", categoryId) }
             }
         } catch (e: Exception) {
@@ -647,7 +647,7 @@ class SupabaseRepository(
     
     suspend fun createSubcategory(subcategory: Subcategory) = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["subcategorias"].insert(subcategory)
+            client.postgrest["subcategoria"].insert(subcategory)
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao criar subcategoria", e)
             throw e
@@ -656,8 +656,8 @@ class SupabaseRepository(
     
     suspend fun updateSubcategoryObj(subcategory: Subcategory) = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["subcategorias"].update(subcategory) {
-                filter { eq("id_subcategoria", subcategory.id!!) }
+            client.postgrest["subcategoria"].update(subcategory) {
+                filter { eq("id_subcategoria", subcategory.idSubcategoria!!) }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao atualizar subcategoria", e)
@@ -667,7 +667,7 @@ class SupabaseRepository(
     
     suspend fun deleteSubcategoryObj(subcategoryId: String) = withContext(Dispatchers.IO) {
         try {
-            client.postgrest["subcategorias"].delete {
+            client.postgrest["subcategoria"].delete {
                 filter { eq("id_subcategoria", subcategoryId) }
             }
         } catch (e: Exception) {
