@@ -1,6 +1,7 @@
 package com.humberto.gestorfinanceiro.data.supabase
 
 import android.util.Log
+import com.humberto.gestorfinanceiro.data.model.ActivityLog
 import com.humberto.gestorfinanceiro.data.model.Category
 import com.humberto.gestorfinanceiro.data.model.Expense
 import com.humberto.gestorfinanceiro.data.model.Goal
@@ -42,12 +43,67 @@ class SupabaseRepository(
     suspend fun saveExpense(expense: Expense) = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Salvando despesa: $expense")
-            client.postgrest["despesas"].insert(expense)
+            // Usar apenas os campos que existem na tabela
+            val expenseToInsert = expense.toInsertModel()
+            client.postgrest["despesas"].insert(expenseToInsert)
             Log.d(TAG, "Despesa salva com sucesso")
+            
+            // Log de inserção no banco
+            val insertData = org.json.JSONObject().apply {
+                put("local", expense.local ?: "")
+                put("valor", expense.valor ?: 0.0)
+                put("data_despesa", expense.dataDespesa ?: "")
+                put("id_subcategoria", expense.idSubcategoria ?: "")
+            }.toString()
+            com.humberto.gestorfinanceiro.data.log.ActivityLogManager.addLog(
+                tipoAtividade = "db_insert",
+                descricao = "Despesa inserida no banco de dados",
+                dados = insertData,
+                sucesso = true
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao salvar despesa", e)
             e.printStackTrace()
+            
+            // Log de erro na inserção
+            val errorData = org.json.JSONObject().apply {
+                put("local", expense.local ?: "")
+                put("valor", expense.valor ?: 0.0)
+                put("error_message", e.message ?: "")
+            }.toString()
+            com.humberto.gestorfinanceiro.data.log.ActivityLogManager.addLog(
+                tipoAtividade = "db_insert",
+                descricao = "Erro ao inserir despesa no banco de dados",
+                dados = errorData,
+                sucesso = false,
+                erro = e.message ?: "Erro desconhecido"
+            )
+            
             throw e
+        }
+    }
+    
+    suspend fun saveActivityLog(
+        tipoAtividade: String,
+        descricao: String? = null,
+        dados: String? = null,
+        sucesso: Boolean = true,
+        erro: String? = null
+    ) = withContext(Dispatchers.IO) {
+        try {
+            val log = ActivityLog(
+                tipoAtividade = tipoAtividade,
+                descricao = descricao,
+                dados = dados,
+                sucesso = sucesso,
+                erro = erro
+            )
+            client.postgrest["activity_log"].insert(log)
+            Log.d(TAG, "Log de atividade salvo: $tipoAtividade")
+        } catch (e: Exception) {
+            // Não lançar exceção aqui para não interromper o fluxo principal
+            Log.e(TAG, "Erro ao salvar log de atividade", e)
+            // Não fazer throw para não quebrar o fluxo principal
         }
     }
     
@@ -88,9 +144,9 @@ class SupabaseRepository(
             if (result.isNotEmpty()) {
                 Log.d(TAG, "Primeira despesa encontrada:")
                 Log.d(TAG, "  - ID: ${result.first().idDespesa}")
-                Log.d(TAG, "  - Estabelecimento: ${result.first().estabelecimento}")
+                Log.d(TAG, "  - Local: ${result.first().local}")
                 Log.d(TAG, "  - Valor: ${result.first().valor}")
-                Log.d(TAG, "  - Data: ${result.first().dataCompetencia}")
+                Log.d(TAG, "  - Data: ${result.first().dataDespesa}")
                 Log.d(TAG, "  - Categoria: ${result.first().categoria}")
             } else {
                 Log.w(TAG, "Nenhuma despesa encontrada na resposta")
@@ -194,6 +250,65 @@ class SupabaseRepository(
         }
     }
     
+    suspend fun getGoalByCategory(idCategoria: String, month: Int, year: Int): Goal? = withContext(Dispatchers.IO) {
+        try {
+            val dataInicio = "%d-%02d-01".format(year, month)
+            Log.d(TAG, "Buscando meta para categoria $idCategoria no período $dataInicio...")
+            
+            val result = client.postgrest["metas"]
+                .select {
+                    filter {
+                        eq("id_categoria", idCategoria)
+                        eq("data_inicio", dataInicio)
+                        eq("periodo", "mensal")
+                    }
+                }
+                .decodeSingleOrNull<Goal>()
+            
+            Log.d(TAG, "Meta encontrada: ${result?.valorMeta}")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar meta da categoria", e)
+            null
+        }
+    }
+    
+    suspend fun upsertGoal(idCategoria: String, valorMeta: Double, month: Int, year: Int) = withContext(Dispatchers.IO) {
+        try {
+            val dataInicio = "%d-%02d-01".format(year, month)
+            
+            // Verificar se já existe meta
+            val existingGoal = getGoalByCategory(idCategoria, month, year)
+            
+            if (existingGoal != null) {
+                // Atualizar meta existente
+                client.postgrest["metas"]
+                    .update({
+                        Goal::valorMeta setTo valorMeta
+                    }) {
+                        filter {
+                            eq("id_meta", existingGoal.idMeta!!)
+                        }
+                    }
+                Log.d(TAG, "Meta atualizada para categoria $idCategoria")
+            } else {
+                // Criar nova meta
+                val newGoal = Goal(
+                    idCategoria = idCategoria,
+                    valorMeta = valorMeta,
+                    periodo = "mensal",
+                    dataInicio = dataInicio
+                )
+                client.postgrest["metas"].insert(newGoal)
+                Log.d(TAG, "Nova meta criada para categoria $idCategoria")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao salvar meta", e)
+            e.printStackTrace()
+            throw e
+        }
+    }
+    
     suspend fun getExpensesByCategoryAndMonth(category: String, month: Int, year: Int): List<Expense> = withContext(Dispatchers.IO) {
         try {
             val filter = "%d-%02d".format(year, month)
@@ -269,9 +384,7 @@ class SupabaseRepository(
                 
                 expense.copy(
                     categoria = category?.nomeCategoria,
-                    subcategoria = subcategory?.nomeSubcategoria,
-                    estabelecimento = expense.local, // Usar 'local' como estabelecimento
-                    dataCompetencia = expense.dataDespesa // Usar data_despesa como data_competencia para compatibilidade
+                    subcategoria = subcategory?.nomeSubcategoria
                 )
             }
             

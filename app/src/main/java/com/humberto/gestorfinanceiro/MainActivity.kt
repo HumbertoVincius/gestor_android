@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
     
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
+    ) { _ ->
         // Handle permission results
     }
 
@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainNavigation() {
-    var selectedScreen by remember { mutableStateOf(Screen.HOME) }
+    var selectedScreen by remember { mutableStateOf(Screen.METAS) }
     
     Scaffold(
         bottomBar = {
@@ -76,14 +76,14 @@ fun MainNavigation() {
                 NavigationBarItem(
                     icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
                     label = { Text("Home") },
-                    selected = selectedScreen == Screen.HOME,
-                    onClick = { selectedScreen = Screen.HOME }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Star, contentDescription = "Metas") },
-                    label = { Text("Metas") },
                     selected = selectedScreen == Screen.METAS,
                     onClick = { selectedScreen = Screen.METAS }
+                )
+                NavigationBarItem(
+                    icon = { Icon(Icons.Default.ShoppingCart, contentDescription = "Despesas") },
+                    label = { Text("Despesas") },
+                    selected = selectedScreen == Screen.HOME,
+                    onClick = { selectedScreen = Screen.HOME }
                 )
                 NavigationBarItem(
                     icon = { Icon(Icons.Default.Edit, contentDescription = "Categorias") },

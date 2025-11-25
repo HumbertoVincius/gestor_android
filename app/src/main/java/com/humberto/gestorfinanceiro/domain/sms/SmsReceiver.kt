@@ -5,12 +5,15 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
+import com.humberto.gestorfinanceiro.data.log.ActivityLogManager
 import com.humberto.gestorfinanceiro.data.settings.SettingsManager
 import com.humberto.gestorfinanceiro.di.Dependencies
+import com.humberto.gestorfinanceiro.utils.NotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 
 class SmsReceiver : BroadcastReceiver() {
 
@@ -36,6 +39,19 @@ class SmsReceiver : BroadcastReceiver() {
                         
                         Log.d("SmsReceiver", "SMS received from $sender: $body")
                         
+                        // Log de captura de SMS
+                        val smsData = JSONObject().apply {
+                            put("sender", sender ?: "unknown")
+                            put("body", body)
+                            put("configured_sender", configuredSenderNumber ?: "")
+                        }.toString()
+                        ActivityLogManager.addLog(
+                            tipoAtividade = "sms_capture",
+                            descricao = "SMS capturado do remetente: $sender",
+                            dados = smsData,
+                            sucesso = true
+                        )
+                        
                         // Filtrar por número do remetente se configurado
                         if (configuredSenderNumber != null && configuredSenderNumber.isNotBlank()) {
                             // Normalizar números para comparação (remover espaços, caracteres especiais)
@@ -44,6 +60,16 @@ class SmsReceiver : BroadcastReceiver() {
                             
                             if (normalizedSender != normalizedConfigured) {
                                 Log.d("SmsReceiver", "SMS ignorado: remetente $sender não corresponde ao número configurado ($configuredSenderNumber)")
+                                
+                                // Log de SMS ignorado
+                                ActivityLogManager.addLog(
+                                    tipoAtividade = "sms_capture",
+                                    descricao = "SMS ignorado: remetente não corresponde ao número configurado",
+                                    dados = smsData,
+                                    sucesso = false,
+                                    erro = "Remetente $sender não corresponde ao número configurado ($configuredSenderNumber)"
+                                )
+                                
                                 return@forEach
                             }
                             
@@ -57,6 +83,16 @@ class SmsReceiver : BroadcastReceiver() {
                         
                         if (subcategories.isEmpty()) {
                             Log.w("SmsReceiver", "Nenhuma subcategoria encontrada no banco. SMS não pode ser processado.")
+                            
+                            // Log de erro: sem subcategorias
+                            ActivityLogManager.addLog(
+                                tipoAtividade = "sms_capture",
+                                descricao = "SMS não processado: nenhuma subcategoria encontrada no banco",
+                                dados = smsData,
+                                sucesso = false,
+                                erro = "Nenhuma subcategoria encontrada no banco de dados"
+                            )
+                            
                             return@forEach
                         }
                         
@@ -66,13 +102,40 @@ class SmsReceiver : BroadcastReceiver() {
                         val expense = Dependencies.llmService.parseSms(body, subcategories, categories)
                         if (expense != null) {
                             Dependencies.supabaseRepository.saveExpense(expense)
-                            Log.d("SmsReceiver", "Despesa salva com sucesso: ${expense.estabelecimento} - ${expense.valor} - Subcategoria: ${expense.subcategoria}")
+                            Log.d("SmsReceiver", "Despesa salva com sucesso: ${expense.local} - R$ ${expense.valor} - Subcategoria: ${expense.subcategoria}")
+                            
+                            // Exibir notificação
+                            NotificationHelper.showExpenseNotification(
+                                context = context,
+                                valor = expense.valor ?: 0.0,
+                                local = expense.local ?: "Desconhecido",
+                                categoria = expense.categoria,
+                                subcategoria = expense.subcategoria
+                            )
                         } else {
                             Log.w("SmsReceiver", "Falha ao processar SMS com LLM")
+                            
+                            // Log de erro: falha no processamento LLM
+                            ActivityLogManager.addLog(
+                                tipoAtividade = "sms_capture",
+                                descricao = "Falha ao processar SMS com LLM",
+                                dados = smsData,
+                                sucesso = false,
+                                erro = "LLM não retornou despesa válida"
+                            )
                         }
                     }
                 } catch (e: Exception) {
                     Log.e("SmsReceiver", "Error processing SMS", e)
+                    
+                    // Log de erro geral no processamento de SMS
+                    ActivityLogManager.addLog(
+                        tipoAtividade = "sms_capture",
+                        descricao = "Erro ao processar SMS",
+                        dados = null,
+                        sucesso = false,
+                        erro = e.message ?: "Erro desconhecido"
+                    )
                 } finally {
                     pendingResult.finish()
                 }

@@ -7,8 +7,8 @@ import java.util.*
 
 fun groupExpensesByDay(expenses: List<Expense>): Map<String, List<Expense>> {
     return expenses
-        .filter { (it.dataCompetencia ?: it.dataDespesa) != null }
-        .groupBy { it.dataCompetencia ?: it.dataDespesa ?: "" }
+        .filter { it.dataDespesa != null }
+        .groupBy { it.dataDespesa ?: "" }
         .toSortedMap(compareByDescending { it })
 }
 

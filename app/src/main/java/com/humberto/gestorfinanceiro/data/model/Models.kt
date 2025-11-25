@@ -9,21 +9,34 @@ data class Expense(
     val valor: Double? = null, // numeric(10,2) - NOT NULL
     @SerialName("data_despesa") val dataDespesa: String? = null, // date - NOT NULL
     @SerialName("id_subcategoria") val idSubcategoria: String? = null, // uuid - NOT NULL
-    val local: String? = null, // text - nullable (usado como estabelecimento)
+    val local: String? = null, // text - nullable (estabelecimento)
     val detalhe: String? = null, // text - nullable
     
-    // Campos calculados/derivados (podem vir de views ou joins)
-    val estabelecimento: String? = null, // alias para 'local' ou vem de view
-    @SerialName("data_competencia") val dataCompetencia: String? = null, // alias para 'data_despesa' ou vem de view
-    val categoria: String? = null, // vem de join com subcategoria
-    val subcategoria: String? = null, // vem de join com subcategoria
-    val hora: String? = null, // pode vir de view ou ser null
-    val cartao: String? = null, // pode vir de view ou ser null
-    @SerialName("final_cartao") val finalCartao: Long? = null, // pode vir de view ou ser null
-    @SerialName("status_transacao") val statusTransacao: String? = null, // pode vir de view ou ser null
-    val vencimento: String? = null, // pode vir de view ou ser null
-    val mes: Long? = null, // calculado
-    @SerialName("created_at") val createdAt: String? = null // pode vir de view ou ser null
+    // Campos derivados de JOINs (apenas para exibição, não são inseridos no banco)
+    val categoria: String? = null, // vem de join: subcategoria -> categoria
+    val subcategoria: String? = null, // vem de join: despesas -> subcategoria
+    @SerialName("nome_categoria") val nomeCategoria: String? = null, // alias para categoria
+    @SerialName("nome_subcategoria") val nomeSubcategoria: String? = null // alias para subcategoria
+) {
+    // Retorna apenas os campos que existem na tabela despesas para INSERT
+    fun toInsertModel(): ExpenseInsert {
+        return ExpenseInsert(
+            valor = valor,
+            dataDespesa = dataDespesa,
+            idSubcategoria = idSubcategoria,
+            local = local,
+            detalhe = detalhe
+        )
+    }
+}
+
+@Serializable
+data class ExpenseInsert(
+    val valor: Double? = null,
+    @SerialName("data_despesa") val dataDespesa: String? = null,
+    @SerialName("id_subcategoria") val idSubcategoria: String? = null,
+    val local: String? = null,
+    val detalhe: String? = null
 )
 
 @Serializable
@@ -49,4 +62,15 @@ data class Subcategory(
     @SerialName("id_subcategoria") val idSubcategoria: String? = null,
     @SerialName("id_categoria") val idCategoria: String? = null,
     @SerialName("nome_subcategoria") val nomeSubcategoria: String? = null
+)
+
+@Serializable
+data class ActivityLog(
+    @SerialName("id_log") val idLog: String? = null, // uuid, nullable for insert
+    @SerialName("tipo_atividade") val tipoAtividade: String, // NOT NULL - 'sms_capture', 'llm_request', 'llm_response', 'db_insert'
+    @SerialName("descricao") val descricao: String? = null, // text - nullable
+    @SerialName("dados") val dados: String? = null, // jsonb - nullable, dados adicionais em JSON
+    @SerialName("sucesso") val sucesso: Boolean = true, // boolean - NOT NULL, default true
+    @SerialName("erro") val erro: String? = null, // text - nullable, mensagem de erro se houver
+    @SerialName("created_at") val createdAt: String? = null // timestamp - nullable, auto-generated
 )

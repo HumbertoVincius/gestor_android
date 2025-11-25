@@ -56,13 +56,6 @@ fun CategoriesScreen() {
                     }
                 }
             )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddCategoryDialog = true }
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Adicionar categoria")
-            }
         }
     ) { paddingValues ->
         if (isLoading) {
@@ -236,7 +229,36 @@ fun CategoryCard(
 ) {
     var subcategories by remember { mutableStateOf<List<Subcategory>>(emptyList()) }
     var isLoadingSubcategories by remember { mutableStateOf(false) }
+    var goalValue by remember { mutableStateOf("") }
+    var isLoadingGoal by remember { mutableStateOf(false) }
+    var isSavingGoal by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    
+    // Obter mês e ano atual
+    val calendar = java.util.Calendar.getInstance()
+    val currentMonth = calendar.get(java.util.Calendar.MONTH) + 1
+    val currentYear = calendar.get(java.util.Calendar.YEAR)
+
+    LaunchedEffect(category.idCategoria) {
+        // Carregar meta atual
+        if (category.idCategoria != null) {
+            isLoadingGoal = true
+            scope.launch {
+                try {
+                    val goal = Dependencies.supabaseRepository.getGoalByCategory(
+                        category.idCategoria, 
+                        currentMonth, 
+                        currentYear
+                    )
+                    goalValue = goal?.valorMeta?.toString() ?: ""
+                } catch (e: Exception) {
+                    goalValue = ""
+                } finally {
+                    isLoadingGoal = false
+                }
+            }
+        }
+    }
 
     LaunchedEffect(category.idCategoria, isExpanded) {
         if (isExpanded && category.idCategoria != null) {
@@ -264,12 +286,68 @@ fun CategoryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = category.nomeCategoria ?: "Sem nome",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = category.nomeCategoria ?: "Sem nome",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    // Campo de meta
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = goalValue,
+                            onValueChange = { goalValue = it },
+                            label = { Text("Meta mensal") },
+                            placeholder = { Text("R$ 0,00") },
+                            modifier = Modifier.width(140.dp),
+                            singleLine = true,
+                            enabled = !isLoadingGoal && !isSavingGoal,
+                            textStyle = MaterialTheme.typography.bodySmall,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                            )
+                        )
+                        
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    val value = goalValue.toDoubleOrNull()
+                                    if (value != null && value > 0 && category.idCategoria != null) {
+                                        isSavingGoal = true
+                                        try {
+                                            Dependencies.supabaseRepository.upsertGoal(
+                                                category.idCategoria,
+                                                value,
+                                                currentMonth,
+                                                currentYear
+                                            )
+                                        } catch (e: Exception) {
+                                            // Tratar erro
+                                        } finally {
+                                            isSavingGoal = false
+                                        }
+                                    }
+                                }
+                            },
+                            enabled = !isSavingGoal && goalValue.toDoubleOrNull() != null
+                        ) {
+                            if (isSavingGoal) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            } else {
+                                Icon(Icons.Default.Check, contentDescription = "Salvar meta")
+                            }
+                        }
+                    }
+                }
+                
                 Row {
                     IconButton(onClick = onEditCategory) {
                         Icon(Icons.Default.Edit, contentDescription = "Editar categoria")

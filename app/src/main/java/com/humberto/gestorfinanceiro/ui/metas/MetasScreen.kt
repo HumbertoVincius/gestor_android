@@ -488,7 +488,7 @@ fun CategoryCard(
                     // Mostrar transações diretamente se não houver subcategorias
                     // Ordenar por data (mais recente primeiro)
                     val sortedExpenses = categoryData.expenses.sortedWith(
-                        compareByDescending<Expense> { it.dataCompetencia ?: "" }
+                        compareByDescending<Expense> { it.dataDespesa ?: "" }
                     )
                     Text(
                         text = "Transações (${sortedExpenses.size}):",
@@ -583,7 +583,7 @@ fun SubcategoryCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 // Ordenar transações por data (mais recente primeiro)
                 val sortedExpenses = expenses.sortedWith(
-                    compareByDescending<Expense> { it.dataCompetencia ?: it.dataDespesa ?: "" }
+                    compareByDescending<Expense> { it.dataDespesa ?: "" }
                 )
                 Text(
                     text = "Transações (${sortedExpenses.size}):",
@@ -625,13 +625,13 @@ fun TransactionItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = expense.estabelecimento ?: "Desconhecido",
+                    text = expense.local ?: "Desconhecido",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
-                (expense.dataCompetencia ?: expense.dataDespesa)?.let { date ->
+                expense.dataDespesa?.let { date ->
                     Text(
-                        text = formatTransactionDate(date, expense.hora),
+                        text = formatTransactionDate(date),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
@@ -771,10 +771,10 @@ fun EditExpenseDialog(
     val calendar = Calendar.getInstance()
     
     // Parse da data atual da despesa
-    val expenseDate = remember(expense.dataCompetencia) {
-        if (expense.dataCompetencia != null) {
+    val expenseDate = remember(expense.dataDespesa) {
+        if (expense.dataDespesa != null) {
             try {
-                val parts = expense.dataCompetencia.split("-")
+                val parts = expense.dataDespesa.split("-")
                 if (parts.size >= 3) {
                     SelectedDate(
                         year = parts[0].toInt(),
@@ -808,7 +808,7 @@ fun EditExpenseDialog(
     var showDatePicker by remember { mutableStateOf(false) }
     
     var valor by remember { mutableStateOf(expense.valor?.toString() ?: "") }
-    var estabelecimento by remember { mutableStateOf(expense.estabelecimento ?: "") }
+    var local by remember { mutableStateOf(expense.local ?: "") }
     var selectedCategory by remember { mutableStateOf<String?>(expense.categoria) }
     var selectedSubcategory by remember { mutableStateOf<String?>(expense.subcategoria) }
     
@@ -898,9 +898,9 @@ fun EditExpenseDialog(
                 )
 
                 OutlinedTextField(
-                    value = estabelecimento,
-                    onValueChange = { estabelecimento = it },
-                    label = { Text("Estabelecimento") },
+                    value = local,
+                    onValueChange = { local = it },
+                    label = { Text("Local/Estabelecimento") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -1022,7 +1022,7 @@ fun EditExpenseDialog(
                                     }
                                     
                                     val valorDouble = valor.toDoubleOrNull() ?: 0.0
-                                    val dataCompetencia = "%d-%02d-%02d".format(
+                                    val dataDespesa = "%d-%02d-%02d".format(
                                         selectedDate.year,
                                         selectedDate.month,
                                         selectedDate.day
@@ -1042,12 +1042,10 @@ fun EditExpenseDialog(
                                     
                                     val updatedExpense = expense.copy(
                                         valor = valorDouble,
-                                        dataDespesa = dataCompetencia,
-                                        local = estabelecimento.ifBlank { null },
+                                        dataDespesa = dataDespesa,
+                                        local = local.ifBlank { null },
                                         idSubcategoria = subcategoriaId,
-                                        // Campos derivados
-                                        dataCompetencia = dataCompetencia,
-                                        estabelecimento = estabelecimento.ifBlank { null },
+                                        // Campos derivados de JOINs
                                         categoria = categoria,
                                         subcategoria = subcategoria
                                     )
@@ -1061,7 +1059,7 @@ fun EditExpenseDialog(
                                 }
                             }
                         },
-                        enabled = !isSaving && valor.isNotBlank() && estabelecimento.isNotBlank()
+                        enabled = !isSaving && valor.isNotBlank() && local.isNotBlank()
                     ) {
                         if (isSaving) {
                             CircularProgressIndicator(

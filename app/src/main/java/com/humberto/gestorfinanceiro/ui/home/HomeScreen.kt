@@ -109,7 +109,7 @@ fun HomeScreen() {
         } else {
             val query = searchQuery.lowercase(Locale.getDefault())
             expenses.filter { expense ->
-                expense.estabelecimento?.lowercase(Locale.getDefault())?.contains(query) == true ||
+                expense.local?.lowercase(Locale.getDefault())?.contains(query) == true ||
                 expense.categoria?.lowercase(Locale.getDefault())?.contains(query) == true ||
                 expense.subcategoria?.lowercase(Locale.getDefault())?.contains(query) == true ||
                 expense.valor?.toString()?.contains(query) == true ||
@@ -199,7 +199,7 @@ fun HomeScreen() {
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 label = { Text("Buscar despesas") },
-                placeholder = { Text("Valor, categoria, subcategoria ou estabelecimento") },
+                placeholder = { Text("Valor, categoria, subcategoria ou local") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
@@ -370,7 +370,7 @@ fun ExpenseListItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = expense.estabelecimento ?: "Desconhecido",
+                    text = expense.local ?: "Desconhecido",
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -593,7 +593,7 @@ fun CreateExpenseDialog(
     var showDatePicker by remember { mutableStateOf(false) }
     
     var valor by remember { mutableStateOf("") }
-    var estabelecimento by remember { mutableStateOf("") }
+    var local by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<String?>(null) }
     var selectedSubcategory by remember { mutableStateOf<String?>(null) }
     
@@ -684,9 +684,9 @@ fun CreateExpenseDialog(
                 )
 
                 OutlinedTextField(
-                    value = estabelecimento,
-                    onValueChange = { estabelecimento = it },
-                    label = { Text("Estabelecimento") },
+                    value = local,
+                    onValueChange = { local = it },
+                    label = { Text("Local/Estabelecimento") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -809,7 +809,7 @@ fun CreateExpenseDialog(
                                     }
                                     
                                     val valorDouble = valor.toDoubleOrNull() ?: 0.0
-                                    val dataCompetencia = "%d-%02d-%02d".format(
+                                    val dataDespesa = "%d-%02d-%02d".format(
                                         selectedDate.year,
                                         selectedDate.month,
                                         selectedDate.day
@@ -829,13 +829,11 @@ fun CreateExpenseDialog(
                                     
                                     val newExpense = Expense(
                                         valor = valorDouble,
-                                        dataDespesa = dataCompetencia,
-                                        local = estabelecimento.ifBlank { null },
-                                        detalhe = null, // Será preenchido apenas na edição
+                                        dataDespesa = dataDespesa,
+                                        local = local.ifBlank { null },
+                                        detalhe = null,
                                         idSubcategoria = subcategoriaId,
-                                        // Campos derivados para exibição
-                                        dataCompetencia = dataCompetencia,
-                                        estabelecimento = estabelecimento.ifBlank { null },
+                                        // Campos derivados de JOINs
                                         categoria = categoria,
                                         subcategoria = subcategoria
                                     )
@@ -849,7 +847,7 @@ fun CreateExpenseDialog(
                                 }
                             }
                         },
-                        enabled = !isSaving && valor.isNotBlank() && estabelecimento.isNotBlank() && 
+                        enabled = !isSaving && valor.isNotBlank() && local.isNotBlank() && 
                                   selectedCategory != null && selectedSubcategory != null
                     ) {
                         if (isSaving) {
@@ -894,8 +892,8 @@ fun EditExpenseDialog(
     val calendar = Calendar.getInstance()
     
     // Parse da data atual da despesa
-    val expenseDate = remember(expense.dataCompetencia ?: expense.dataDespesa) {
-        val dateStr = expense.dataCompetencia ?: expense.dataDespesa
+    val expenseDate = remember(expense.dataDespesa) {
+        val dateStr = expense.dataDespesa
         if (dateStr != null) {
             try {
                 val parts = dateStr.split("-")
@@ -932,7 +930,7 @@ fun EditExpenseDialog(
     var showDatePicker by remember { mutableStateOf(false) }
     
     var valor by remember { mutableStateOf(expense.valor?.toString() ?: "") }
-    var estabelecimento by remember { mutableStateOf(expense.estabelecimento ?: expense.local ?: "") }
+    var local by remember { mutableStateOf(expense.local ?: "") }
     var detalhe by remember { mutableStateOf(expense.detalhe ?: "") }
     var selectedCategory by remember { mutableStateOf<String?>(expense.categoria) }
     var selectedSubcategory by remember { mutableStateOf<String?>(expense.subcategoria) }
@@ -1023,9 +1021,9 @@ fun EditExpenseDialog(
                 )
 
                 OutlinedTextField(
-                    value = estabelecimento,
-                    onValueChange = { estabelecimento = it },
-                    label = { Text("Estabelecimento") },
+                    value = local,
+                    onValueChange = { local = it },
+                    label = { Text("Local/Estabelecimento") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -1156,7 +1154,7 @@ fun EditExpenseDialog(
                                     }
                                     
                                     val valorDouble = valor.toDoubleOrNull() ?: 0.0
-                                    val dataCompetencia = "%d-%02d-%02d".format(
+                                    val dataDespesa = "%d-%02d-%02d".format(
                                         selectedDate.year,
                                         selectedDate.month,
                                         selectedDate.day
@@ -1176,13 +1174,11 @@ fun EditExpenseDialog(
                                     
                                     val updatedExpense = expense.copy(
                                         valor = valorDouble,
-                                        dataDespesa = dataCompetencia,
-                                        local = estabelecimento.ifBlank { null },
+                                        dataDespesa = dataDespesa,
+                                        local = local.ifBlank { null },
                                         detalhe = detalhe.ifBlank { null },
                                         idSubcategoria = subcategoriaId,
-                                        // Campos derivados para exibição
-                                        dataCompetencia = dataCompetencia,
-                                        estabelecimento = estabelecimento.ifBlank { null },
+                                        // Campos derivados de JOINs
                                         categoria = categoria,
                                         subcategoria = subcategoria
                                     )
@@ -1196,7 +1192,7 @@ fun EditExpenseDialog(
                                 }
                             }
                         },
-                        enabled = !isSaving && valor.isNotBlank() && estabelecimento.isNotBlank()
+                        enabled = !isSaving && valor.isNotBlank() && local.isNotBlank()
                     ) {
                         if (isSaving) {
                             CircularProgressIndicator(
