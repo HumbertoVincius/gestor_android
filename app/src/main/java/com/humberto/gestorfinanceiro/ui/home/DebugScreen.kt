@@ -14,9 +14,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.humberto.gestorfinanceiro.data.log.ActivityLogManager
 import com.humberto.gestorfinanceiro.data.settings.SettingsManager
 import com.humberto.gestorfinanceiro.data.supabase.ConnectionTestResult
@@ -451,7 +456,9 @@ fun DebugScreen() {
             }
         }
         
-        // Seção de Teste LLM (mantida, já gera logs) (mantida, já gera logs)
+        // Seção de Teste LLM - Layout tipo Chat
+        val clipboardManager = LocalClipboardManager.current
+        
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
@@ -460,35 +467,222 @@ fun DebugScreen() {
                 .padding(bottom = 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(500.dp)
             ) {
-                Text(
-                    text = "Teste de LLM",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Registrar Despesa",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 
-                OutlinedTextField(
-                    value = testSmsText,
-                    onValueChange = { testSmsText = it },
-                    label = { Text("Texto do SMS") },
-                    placeholder = { Text("Digite o texto do SMS para testar") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 3,
-                    maxLines = 5,
-                    supportingText = {
-                        Text(
-                            text = "Este teste processará o texto com a LLM e salvará o resultado no banco de dados.",
-                            style = MaterialTheme.typography.bodySmall
-                        )
+                Divider()
+                
+                // Área de mensagem/resultado (scrollable)
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Mensagem padrão (sempre visível)
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text(
+                                text = "💬 Mensagem Padrão",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = testSmsText.ifBlank { "R$49,99 no bar do zé em 24/11/2025" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
-                )
+                    
+                    // Resultado do processamento
+                    llmTestResult?.let { result ->
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "✓ Sucesso",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    IconButton(
+                                        onClick = {
+                                            clipboardManager.setText(AnnotatedString(result))
+                                        },
+                                        modifier = Modifier.size(32.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ContentCopy,
+                                            contentDescription = "Copiar",
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = result,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Erro
+                    llmTestError?.let { error ->
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp)
+                            ) {
+                                Text(
+                                    text = "✗ Erro",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = error,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
                 
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
+                Divider()
+                
+                // Área de input e botões (fixa na parte inferior)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Botões de ação (limpar, copiar, colar)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        IconButton(
+                            onClick = { testSmsText = "" },
+                            modifier = Modifier
+                                .weight(1f)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Limpar",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        
+                        IconButton(
+                            onClick = {
+                                val textToCopy = testSmsText.ifBlank { "R$49,99 no bar do zé em 24/11/2025" }
+                                clipboardManager.setText(AnnotatedString(textToCopy))
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        ) {
+                            Icon(
+                                Icons.Default.ContentCopy,
+                                contentDescription = "Copiar",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        
+                        IconButton(
+                            onClick = {
+                                val clipboardText = clipboardManager.getText()?.text ?: ""
+                                testSmsText = clipboardText
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        ) {
+                            Icon(
+                                Icons.Default.ArrowDownward,
+                                contentDescription = "Colar",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    
+                    // Campo de input
+                    OutlinedTextField(
+                        value = testSmsText,
+                        onValueChange = { testSmsText = it },
+                        label = { Text("Digite o texto da despesa") },
+                        placeholder = { Text("Ex: R$49,99 no bar do zé em 24/11/2025") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4,
+                        trailingIcon = {
+                            if (testSmsText.isNotBlank()) {
+                                IconButton(onClick = { testSmsText = "" }) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Limpar",
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    )
+                    
+                    // Botão de enviar
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = {
                             scope.launch {
                                 isProcessingLlm = true
                                 llmTestResult = null
@@ -543,6 +737,9 @@ fun DebugScreen() {
                                                 categoria = expense.categoria,
                                                 subcategoria = expense.subcategoria
                                             )
+                                            
+                                            // Limpar o campo após sucesso
+                                            testSmsText = ""
                                         } else {
                                             llmTestError = "A LLM não conseguiu processar o texto. Verifique os logs abaixo para mais detalhes."
                                             Log.w(TAG, "Falha ao processar SMS com LLM")
@@ -557,78 +754,24 @@ fun DebugScreen() {
                                 }
                             }
                         },
-                    enabled = !isProcessingLlm && testSmsText.isNotBlank()
-                ) {
-                    if (isProcessingLlm) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Processando...")
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Processar",
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Processar e Salvar")
-                    }
-                }
-                
-                // Mostrar resultado do teste
-                llmTestResult?.let { result ->
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        ),
-                        modifier = Modifier.fillMaxWidth()
+                        enabled = !isProcessingLlm && testSmsText.isNotBlank()
                     ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp)
-                        ) {
-                            Text(
-                                text = "✓ Sucesso",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                        if (isProcessingLlm) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = result,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Processando...")
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "Enviar",
+                                modifier = Modifier.size(18.dp)
                             )
-                        }
-                    }
-                }
-                
-                llmTestError?.let { error ->
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp)
-                        ) {
-                            Text(
-                                text = "✗ Erro",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = error,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Processar e Salvar")
                         }
                     }
                 }
