@@ -2,6 +2,7 @@ package com.humberto.gestorfinanceiro
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -21,6 +22,7 @@ import com.humberto.gestorfinanceiro.ui.home.HomeScreen
 import com.humberto.gestorfinanceiro.ui.metas.MetasScreen
 import com.humberto.gestorfinanceiro.ui.navigation.Screen
 import com.humberto.gestorfinanceiro.ui.theme.GestorFinanceiroTheme
+import com.humberto.gestorfinanceiro.utils.NotificationHelper
 
 class MainActivity : ComponentActivity() {
     
@@ -35,6 +37,9 @@ class MainActivity : ComponentActivity() {
         
         // Inicializar SettingsManager
         SettingsManager.initialize(this)
+        
+        // Criar canal de notificação
+        NotificationHelper.createNotificationChannel(this)
         
         checkPermissions()
         
@@ -51,10 +56,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions() {
-        val permissions = arrayOf(
+        val permissions = mutableListOf(
             Manifest.permission.RECEIVE_SMS,
             Manifest.permission.READ_SMS
         )
+        
+        // Adicionar permissão de notificação para Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
         
         val permissionsToRequest = permissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -69,6 +79,21 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainNavigation() {
     var selectedScreen by remember { mutableStateOf(Screen.METAS) }
+    var expandedCategory by remember { mutableStateOf<String?>(null) }
+    
+    // Processar deep link do intent
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        val intent = (context as? MainActivity)?.intent
+        val data = intent?.data
+        if (data?.scheme == "app" && data.host == "home") {
+            val categoryParam = data.getQueryParameter("category")
+            if (categoryParam != null) {
+                selectedScreen = Screen.HOME
+                expandedCategory = categoryParam
+            }
+        }
+    }
     
     Scaffold(
         bottomBar = {
@@ -106,7 +131,7 @@ fun MainNavigation() {
                 .padding(paddingValues)
         ) {
             when (selectedScreen) {
-                Screen.HOME -> HomeScreen()
+                Screen.HOME -> HomeScreen(expandedCategory = expandedCategory)
                 Screen.METAS -> MetasScreen()
                 Screen.CATEGORIES -> CategoriesScreen()
                 Screen.DEBUG -> DebugScreen()

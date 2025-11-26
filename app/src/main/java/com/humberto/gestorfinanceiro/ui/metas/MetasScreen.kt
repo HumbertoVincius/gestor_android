@@ -28,6 +28,10 @@ import com.humberto.gestorfinanceiro.ui.home.CustomDatePickerDialog
 import com.humberto.gestorfinanceiro.ui.home.SelectedDate
 import com.humberto.gestorfinanceiro.ui.home.formatCurrency
 import com.humberto.gestorfinanceiro.ui.home.normalizeText
+import com.humberto.gestorfinanceiro.ui.components.PieChart
+import com.humberto.gestorfinanceiro.ui.components.PieChartData
+import com.humberto.gestorfinanceiro.ui.components.pieChartColors
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -129,17 +133,27 @@ fun MetasScreen() {
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     val scope = rememberCoroutineScope()
 
-    fun loadData() {
+    fun loadData(forceRefresh: Boolean = false) {
         scope.launch {
             isLoading = true
             try {
-                goals = Dependencies.supabaseRepository.getGoalsByMonth(selectedMonth, selectedYear)
-                val allExpenses = Dependencies.supabaseRepository.getExpensesByMonth(
-                    selectedMonth,
-                    selectedYear,
-                    com.humberto.gestorfinanceiro.data.model.SortOrder.DATE_DESC
-                )
-                expenses = allExpenses
+                // ✅ Usar cache e buscar em paralelo
+                val goalsDeferred = async {
+                    Dependencies.supabaseRepository.getGoalsByMonthCached(selectedMonth, selectedYear, forceRefresh)
+                }
+                val expensesDeferred = async {
+                    Dependencies.supabaseRepository.getExpensesByMonthCached(
+                        selectedMonth,
+                        selectedYear,
+                        com.humberto.gestorfinanceiro.data.model.SortOrder.DATE_DESC,
+                        forceRefresh
+                    )
+                }
+                
+                // Aguardar ambos terminarem (paralelo!)
+                goals = goalsDeferred.await()
+                expenses = expensesDeferred.await()
+                
                 Log.d(TAG, "Metas carregadas: ${goals.size}, Despesas: ${expenses.size}")
             } catch (e: Exception) {
                 Log.e(TAG, "Erro ao carregar dados", e)
@@ -270,7 +284,7 @@ fun MetasScreen() {
                             Icon(Icons.Default.ArrowForward, contentDescription = "Próximo mês")
                         }
                         IconButton(
-                            onClick = { loadData() }
+                            onClick = { loadData(forceRefresh = true) }
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = "Atualizar")
                         }
@@ -307,6 +321,43 @@ fun MetasScreen() {
                         totalPlanejado = goals.sumOf { it.valorMeta?.toDouble() ?: 0.0 },
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
+                }
+                
+                // Gráfico de pizza
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = "Distribuição por Categoria",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            
+                            // Preparar dados para o gráfico
+                            val pieChartData = sortedCategories
+                                .filter { it.realized > 0 } // Apenas categorias com gastos
+                                .mapIndexed { index, categoryData ->
+                                    PieChartData(
+                                        label = categoryData.category,
+                                        value = categoryData.realized,
+                                        color = pieChartColors[index % pieChartColors.size]
+                                    )
+                                }
+                            
+                            PieChart(data = pieChartData)
+                        }
+                    }
                 }
                 
                 items(sortedCategories, key = { it.category }) { categoryData ->
@@ -832,13 +883,14 @@ fun EditExpenseDialog(
     LaunchedEffect(Unit) {
         scope.launch {
             try {
-                categories = Dependencies.supabaseRepository.getUniqueCategories()
+                // ✅ Usar cache
+                categories = Dependencies.supabaseRepository.getUniqueCategoriesCached()
                 if (selectedCategory != null) {
-                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategories(selectedCategory)
+                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategoriesCached(selectedCategory)
                 } else {
-                    val allExpenses = Dependencies.supabaseRepository.getAllExpenses()
-                    subcategories = allExpenses
-                        .mapNotNull { it.subcategoria }
+                    val allSubcategories = Dependencies.supabaseRepository.getSubcategoriesListCached()
+                    subcategories = allSubcategories
+                        .mapNotNull { it.nomeSubcategoria }
                         .filter { it.isNotBlank() }
                         .distinct()
                         .sorted()
@@ -855,11 +907,12 @@ fun EditExpenseDialog(
         scope.launch {
             try {
                 if (selectedCategory != null) {
-                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategories(selectedCategory)
+                    // ✅ Usar cache
+                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategoriesCached(selectedCategory)
                 } else {
-                    val allExpenses = Dependencies.supabaseRepository.getAllExpenses()
-                    subcategories = allExpenses
-                        .mapNotNull { it.subcategoria }
+                    val allSubcategories = Dependencies.supabaseRepository.getSubcategoriesListCached()
+                    subcategories = allSubcategories
+                        .mapNotNull { it.nomeSubcategoria }
                         .filter { it.isNotBlank() }
                         .distinct()
                         .sorted()

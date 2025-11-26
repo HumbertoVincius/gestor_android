@@ -104,7 +104,7 @@ class OpenAILlmService(private val apiKey: String) : LlmService {
                 Extract the following information from this bank SMS and return it as a JSON object matching these fields:
                 - estabelecimento (string, merchant/establishment name)
                 - valor (number, transaction amount, just the numeric value)
-                - data_despesa (string, date in format YYYY-MM-DD, use current date if not found in SMS)
+                - data_despesa (string, date in format YYYY-MM-DD)
                 - id_subcategoria (string UUID, choose the MOST APPROPRIATE subcategory ID from the list below based on the establishment type and transaction context)
                 
                 AVAILABLE SUBCATEGORIES (choose the best match):
@@ -116,6 +116,12 @@ class OpenAILlmService(private val apiKey: String) : LlmService {
                 - If unsure, choose the most general subcategory within the appropriate category
                 - ALWAYS include id_subcategoria in your response
                 - You MUST choose one of the subcategory IDs from the list above
+                
+                DATE HANDLING:
+                - If the date in SMS is in format DD/MM (without year), use the CURRENT YEAR
+                - If the date in SMS is in format DD/MM/YYYY, convert to YYYY-MM-DD
+                - If no date is found, use the current date
+                - Current year is ${java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)}
                 
                 SMS TEXT TO ANALYZE:
                 "$smsBody"

@@ -101,7 +101,7 @@ class SmsReceiver : BroadcastReceiver() {
                         // Processar SMS com LLM usando subcategorias reais
                         val expense = Dependencies.llmService.parseSms(body, subcategories, categories)
                         if (expense != null) {
-                            Dependencies.supabaseRepository.saveExpense(expense)
+                            Dependencies.supabaseRepository.saveExpense(expense, context)
                             Log.d("SmsReceiver", "Despesa salva com sucesso: ${expense.local} - R$ ${expense.valor} - Subcategoria: ${expense.subcategoria}")
                             
                             // Exibir notificação

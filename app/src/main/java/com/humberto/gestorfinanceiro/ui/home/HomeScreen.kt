@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
@@ -53,7 +54,7 @@ fun getMonthYearString(month: Int, year: Int): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(expandedCategory: String? = null) {
     val calendar = Calendar.getInstance()
     var selectedMonth by remember { mutableIntStateOf(calendar.get(Calendar.MONTH) + 1) }
     var selectedYear by remember { mutableIntStateOf(calendar.get(Calendar.YEAR)) }
@@ -62,17 +63,32 @@ fun HomeScreen() {
     var sortOrder by remember { mutableStateOf(SortOrder.DATE_DESC) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf(expandedCategory ?: "") }
+    var showOnlyUnseen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    fun loadExpenses() {
+    fun markAsSeen(expenseId: String) {
+        // Optimistic update: atualiza a lista localmente instantaneamente
+        expenses = expenses.map { 
+            if (it.idDespesa == expenseId) it.copy(visto = true) else it 
+        }
+        
+        // Envia para o banco em background
+        scope.launch {
+            Dependencies.supabaseRepository.markExpenseAsSeen(expenseId)
+        }
+    }
+
+    fun loadExpenses(forceRefresh: Boolean = false) {
         scope.launch {
             isLoading = true
             try {
-                val fetchedExpenses = Dependencies.supabaseRepository.getExpensesByMonth(
+                // ✅ Usar cache para performance
+                val fetchedExpenses = Dependencies.supabaseRepository.getExpensesByMonthCached(
                     selectedMonth,
                     selectedYear,
-                    sortOrder
+                    sortOrder,
+                    forceRefresh
                 )
                 expenses = fetchedExpenses
                 Log.d(TAG, "Despesas carregadas: ${fetchedExpenses.size}")
@@ -102,13 +118,17 @@ fun HomeScreen() {
         loadExpenses()
     }
 
-    // Filtrar despesas baseado na busca
-    val filteredExpenses = remember(expenses, searchQuery) {
-        if (searchQuery.isBlank()) {
-            expenses
-        } else {
+    // Filtrar despesas baseado na busca e filtro de não vistos
+    val filteredExpenses = remember(expenses, searchQuery, showOnlyUnseen) {
+        var list = expenses
+        
+        if (showOnlyUnseen) {
+            list = list.filter { it.visto == false }
+        }
+
+        if (searchQuery.isNotBlank()) {
             val query = searchQuery.lowercase(Locale.getDefault())
-            expenses.filter { expense ->
+            list = list.filter { expense ->
                 expense.local?.lowercase(Locale.getDefault())?.contains(query) == true ||
                 expense.categoria?.lowercase(Locale.getDefault())?.contains(query) == true ||
                 expense.subcategoria?.lowercase(Locale.getDefault())?.contains(query) == true ||
@@ -116,6 +136,7 @@ fun HomeScreen() {
                 formatCurrency(expense.valor ?: 0.0).lowercase(Locale.getDefault()).contains(query)
             }
         }
+        list
     }
 
     val groupedExpenses = remember(filteredExpenses) {
@@ -165,7 +186,7 @@ fun HomeScreen() {
                             Icon(Icons.Default.ArrowForward, contentDescription = "Próximo mês")
                         }
                         IconButton(
-                            onClick = { loadExpenses() }
+                            onClick = { loadExpenses(forceRefresh = true) }
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = "Atualizar")
                         }
@@ -194,33 +215,51 @@ fun HomeScreen() {
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // Campo de busca
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                label = { Text("Buscar despesas") },
-                placeholder = { Text("Valor, categoria, subcategoria ou local") },
+            // Campo de busca e Filtro
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 16.dp),
-                singleLine = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Buscar"
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Limpar busca"
-                            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Buscar despesas") },
+                    placeholder = { Text("Valor, categoria, etc") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = "Limpar")
+                            }
                         }
                     }
+                )
+                
+                // Filtro de Não Vistos
+                FilledIconToggleButton(
+                    checked = showOnlyUnseen,
+                    onCheckedChange = { showOnlyUnseen = it },
+                    colors = IconButtonDefaults.iconToggleButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        checkedContainerColor = MaterialTheme.colorScheme.primary,
+                        checkedContentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    if (showOnlyUnseen) {
+                        Icon(Icons.Default.Info, contentDescription = "Mostrar todas")
+                    } else {
+                        Icon(Icons.Default.Info, contentDescription = "Mostrar apenas novas")
+                    }
                 }
-            )
+            }
 
             // Card de resumo do mês
             MonthlySummaryCard(
@@ -269,6 +308,9 @@ fun HomeScreen() {
                                 },
                                 onDeleteClick = { 
                                     expense.idDespesa?.let { id -> deleteExpense(id) }
+                                },
+                                onMarkAsSeen = {
+                                    expense.idDespesa?.let { id -> markAsSeen(id) }
                                 }
                             )
                         }
@@ -353,13 +395,25 @@ fun DayHeader(
 fun ExpenseListItem(
     expense: Expense,
     onEditClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onDeleteClick: () -> Unit,
+    onMarkAsSeen: () -> Unit
 ) {
+    val isUnseen = expense.visto == false
+    
     Card(
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (isUnseen) 
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) 
+            else 
+                MaterialTheme.colorScheme.surface
         ),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                if (isUnseen) {
+                    onMarkAsSeen()
+                }
+            }
     ) {
         Row(
             modifier = Modifier
@@ -369,12 +423,24 @@ fun ExpenseListItem(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = expense.local ?: "Desconhecido",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isUnseen) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(Color(0xFF4CAF50), CircleShape) // Verde vibrante
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    
+                    Text(
+                        text = expense.local ?: "Desconhecido",
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (isUnseen) FontWeight.ExtraBold else FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                
                 val categoryText = buildString {
                     append(expense.categoria ?: "Outros")
                     if (!expense.subcategoria.isNullOrBlank()) {
@@ -580,6 +646,7 @@ fun CreateExpenseDialog(
     defaultMonth: Int,
     defaultYear: Int
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val calendar = Calendar.getInstance()
     var selectedDate by remember { 
         mutableStateOf(
@@ -618,11 +685,11 @@ fun CreateExpenseDialog(
     LaunchedEffect(Unit) {
         scope.launch {
             try {
-                categories = Dependencies.supabaseRepository.getUniqueCategories()
-                // Carregar todas as subcategorias inicialmente
-                val allExpenses = Dependencies.supabaseRepository.getAllExpenses()
-                subcategories = allExpenses
-                    .mapNotNull { it.subcategoria }
+                // ✅ Usar cache para carregar categorias instantaneamente
+                categories = Dependencies.supabaseRepository.getUniqueCategoriesCached()
+                val allSubcategories = Dependencies.supabaseRepository.getSubcategoriesListCached()
+                subcategories = allSubcategories
+                    .mapNotNull { it.nomeSubcategoria }
                     .filter { it.isNotBlank() }
                     .distinct()
                     .sorted()
@@ -639,13 +706,13 @@ fun CreateExpenseDialog(
         scope.launch {
             try {
                 if (selectedCategory != null) {
-                    // Buscar subcategorias específicas da categoria selecionada
-                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategories(selectedCategory)
+                    // ✅ Buscar do cache
+                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategoriesCached(selectedCategory)
                 } else {
-                    // Se não há categoria selecionada, mostrar todas as subcategorias
-                    val allExpenses = Dependencies.supabaseRepository.getAllExpenses()
-                    subcategories = allExpenses
-                        .mapNotNull { it.subcategoria }
+                    // Se não há categoria selecionada, mostrar todas do cache
+                    val allSubcategories = Dependencies.supabaseRepository.getSubcategoriesListCached()
+                    subcategories = allSubcategories
+                        .mapNotNull { it.nomeSubcategoria }
                         .filter { it.isNotBlank() }
                         .distinct()
                         .sorted()
@@ -733,6 +800,9 @@ fun CreateExpenseDialog(
                             DropdownMenuItem(
                                 text = { Text(category) },
                                 onClick = {
+                                    if (selectedCategory != category) {
+                                        selectedSubcategory = null
+                                    }
                                     selectedCategory = category
                                     categoryExpanded = false
                                 }
@@ -835,10 +905,11 @@ fun CreateExpenseDialog(
                                         idSubcategoria = subcategoriaId,
                                         // Campos derivados de JOINs
                                         categoria = categoria,
-                                        subcategoria = subcategoria
+                                        subcategoria = subcategoria,
+                                        visto = true // Despesas criadas manualmente são consideradas vistas
                                     )
                                     
-                                    Dependencies.supabaseRepository.createExpense(newExpense)
+                                    Dependencies.supabaseRepository.createExpense(newExpense, context)
                                     onExpenseCreated()
                                 } catch (e: Exception) {
                                     Log.e(TAG, "Erro ao criar despesa", e)
@@ -955,13 +1026,14 @@ fun EditExpenseDialog(
     LaunchedEffect(Unit) {
         scope.launch {
             try {
-                categories = Dependencies.supabaseRepository.getUniqueCategories()
+                // ✅ Usar cache
+                categories = Dependencies.supabaseRepository.getUniqueCategoriesCached()
                 if (selectedCategory != null) {
-                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategories(selectedCategory)
+                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategoriesCached(selectedCategory)
                 } else {
-                    val allExpenses = Dependencies.supabaseRepository.getAllExpenses()
-                    subcategories = allExpenses
-                        .mapNotNull { it.subcategoria }
+                    val allSubcategories = Dependencies.supabaseRepository.getSubcategoriesListCached()
+                    subcategories = allSubcategories
+                        .mapNotNull { it.nomeSubcategoria }
                         .filter { it.isNotBlank() }
                         .distinct()
                         .sorted()
@@ -978,11 +1050,12 @@ fun EditExpenseDialog(
         scope.launch {
             try {
                 if (selectedCategory != null) {
-                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategories(selectedCategory)
+                    // ✅ Usar cache
+                    subcategories = Dependencies.supabaseRepository.getUniqueSubcategoriesCached(selectedCategory)
                 } else {
-                    val allExpenses = Dependencies.supabaseRepository.getAllExpenses()
-                    subcategories = allExpenses
-                        .mapNotNull { it.subcategoria }
+                    val allSubcategories = Dependencies.supabaseRepository.getSubcategoriesListCached()
+                    subcategories = allSubcategories
+                        .mapNotNull { it.nomeSubcategoria }
                         .filter { it.isNotBlank() }
                         .distinct()
                         .sorted()
@@ -1078,6 +1151,9 @@ fun EditExpenseDialog(
                             DropdownMenuItem(
                                 text = { Text(category) },
                                 onClick = {
+                                    if (selectedCategory != category) {
+                                        selectedSubcategory = null
+                                    }
                                     selectedCategory = category
                                     categoryExpanded = false
                                 }
@@ -1160,14 +1236,22 @@ fun EditExpenseDialog(
                                         selectedDate.day
                                     )
                                     
-                                    // Buscar ID da subcategoria
-                                    val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
-                                        categoria,
-                                        subcategoria
-                                    )
+                                    // OTIMIZAÇÃO: Se o usuário NÃO mudou categoria e subcategoria, usar o ID original
+                                    val subcategoriaId: String? = if (categoria == expense.categoria && subcategoria == expense.subcategoria) {
+                                        Log.d(TAG, "Usando ID original da subcategoria: ${expense.idSubcategoria}")
+                                        expense.idSubcategoria
+                                    } else {
+                                        // Buscar ID da subcategoria pelo nome
+                                        Dependencies.supabaseRepository.getSubcategoryIdByName(
+                                            categoria,
+                                            subcategoria
+                                        )
+                                    }
+                                    
+                                    Log.d(TAG, "Atualização - Categoria: '$categoria', Sub: '$subcategoria' -> ID: $subcategoriaId")
                                     
                                     if (subcategoriaId == null) {
-                                        Log.e(TAG, "Subcategoria não encontrada")
+                                        Log.e(TAG, "ERRO: Subcategoria não encontrada no banco")
                                         isSaving = false
                                         return@launch
                                     }

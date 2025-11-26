@@ -40,13 +40,48 @@ class SupabaseRepository(
         private const val TAG = "SupabaseRepository"
     }
 
-    suspend fun saveExpense(expense: Expense) = withContext(Dispatchers.IO) {
+    suspend fun markExpenseAsSeen(expenseId: String) = withContext(Dispatchers.IO) {
         try {
-            Log.d(TAG, "Salvando despesa: $expense")
+            Log.d(TAG, "Marcando despesa como vista: $expenseId")
+            val updateData = mapOf("visto" to true)
+            
+            client.postgrest["despesas"]
+                .update(updateData) {
+                    filter {
+                        eq("id_despesa", expenseId)
+                    }
+                }
+            
+            // Invalidar cache para refletir na UI
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateExpenses()
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao marcar despesa como vista", e)
+        }
+    }
+
+    suspend fun saveExpense(expense: Expense, context: android.content.Context? = null) = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Salvando despesa: ${expense.local} - R$ ${expense.valor}")
+            
             // Usar apenas os campos que existem na tabela
             val expenseToInsert = expense.toInsertModel()
             client.postgrest["despesas"].insert(expenseToInsert)
             Log.d(TAG, "Despesa salva com sucesso")
+            
+            // Invalidar cache de despesas
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateExpenses()
+            
+            // Verificar metas após salvar
+            if (context != null) {
+                try {
+                    val result = checkAndNotifyGoals(expense, context)
+                    if (result.isNotEmpty()) {
+                        Log.d(TAG, "🔔 Notificações enviadas para: ${result.joinToString()}")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erro ao verificar metas", e)
+                }
+            }
             
             // Log de inserção no banco
             val insertData = org.json.JSONObject().apply {
@@ -80,6 +115,144 @@ class SupabaseRepository(
             )
             
             throw e
+        }
+    }
+    
+    /**
+     * Verifica se alguma meta atingiu 80% e envia notificação
+     * Retorna lista de categorias que atingiram 80%
+     */
+    suspend fun checkAndNotifyGoals(expense: Expense, context: android.content.Context): List<String> = withContext(Dispatchers.IO) {
+        try {
+            Log.d(TAG, "Verificando metas para despesa: ${expense.local} - R$ ${expense.valor}")
+            
+            // Extrair mês/ano da despesa
+            val dateParts = expense.dataDespesa?.split("-")
+            if (dateParts == null || dateParts.size < 2) {
+                Log.w(TAG, "Data da despesa inválida: ${expense.dataDespesa}")
+                return@withContext emptyList()
+            }
+            
+            val year = dateParts[0].toInt()
+            val month = dateParts[1].toInt()
+            
+            // Buscar subcategoria para obter id_categoria
+            val subcategory = getSubcategoriesListCached().find { it.idSubcategoria == expense.idSubcategoria }
+                ?: return@withContext emptyList()
+            
+            val categoryId = subcategory.idCategoria ?: return@withContext emptyList()
+            
+            // Buscar meta da categoria para o mês atual
+            var goal = getGoalByCategory(categoryId, month, year)
+            
+            // Se não existe meta para este mês, tentar copiar do mês anterior
+            if (goal == null) {
+                Log.d(TAG, "Nenhuma meta encontrada para $month/$year")
+                
+                // Buscar meta do mês anterior
+                val previousMonth = if (month == 1) 12 else month - 1
+                val previousYear = if (month == 1) year - 1 else year
+                val previousGoal = getGoalByCategory(categoryId, previousMonth, previousYear)
+                
+                if (previousGoal != null && previousGoal.valorMeta != null) {
+                    Log.d(TAG, "Meta encontrada no mês anterior ($previousMonth/$previousYear). Criando meta para o mês atual...")
+                    
+                    // Criar nova meta para o mês atual baseada na anterior
+                    try {
+                        val dataInicio = "%d-%02d-01".format(year, month)
+                        val newGoal = Goal(
+                            idCategoria = categoryId,
+                            valorMeta = previousGoal.valorMeta,
+                            periodo = "mensal",
+                            dataInicio = dataInicio,
+                            lastNotifiedThreshold = 0 // Novo mês, threshold zerado
+                        )
+                        
+                        client.postgrest["metas"].insert(newGoal)
+                        Log.d(TAG, "✅ Meta criada automaticamente para $month/$year: R$ ${previousGoal.valorMeta}")
+                        
+                        // Invalidar cache e buscar novamente
+                        com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateGoals()
+                        goal = getGoalByCategory(categoryId, month, year)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Erro ao criar meta automática", e)
+                        return@withContext emptyList()
+                    }
+                } else {
+                    Log.d(TAG, "Nenhuma meta anterior encontrada. Pulando verificação.")
+                    return@withContext emptyList()
+                }
+            }
+            
+            // Se ainda não tem meta após tentativa de criar, retornar
+            if (goal == null) return@withContext emptyList()
+            
+            // Calcular total gasto na categoria
+            val expenses = getExpensesByMonthCached(month, year, SortOrder.DATE_DESC, forceRefresh = true)
+            val allSubcats = getSubcategoriesListCached()
+            
+            val categoryExpenses = expenses.filter { exp ->
+                val subcat = allSubcats.find { it.idSubcategoria == exp.idSubcategoria }
+                subcat?.idCategoria == categoryId
+            }
+            
+            val totalSpent = categoryExpenses.sumOf { it.valor ?: 0.0 }
+            
+            // Calcular porcentagem e determinar faixa
+            val goalValue = goal.valorMeta ?: return@withContext emptyList()
+            val percentage = (totalSpent / goalValue) * 100
+            
+            // Determinar a faixa atual (80, 90, 100, 110, etc.)
+            val currentThreshold = when {
+                percentage < 80.0 -> 0
+                percentage < 90.0 -> 80
+                percentage < 100.0 -> 90
+                else -> ((percentage / 10).toInt() * 10) // 100, 110, 120, 130...
+            }
+            
+            val lastThreshold = goal.getEffectiveThreshold()
+            
+            // Só notificar se atingiu uma nova faixa
+            if (currentThreshold > 0 && currentThreshold > lastThreshold) {
+                Log.d(TAG, "🔔 Nova faixa atingida: ${currentThreshold}% (anterior: ${lastThreshold}%)")
+                
+                // Atualizar a última faixa notificada no banco
+                val updateData = mapOf("last_notified_threshold" to currentThreshold)
+                client.postgrest["metas"]
+                    .update(updateData) {
+                        filter {
+                            eq("id_meta", goal.idMeta!!)
+                        }
+                    }
+                
+                // Enviar notificação com texto apropriado
+                val category = getCategoriesListCached().find { it.idCategoria == categoryId }
+                val categoryName = category?.nomeCategoria ?: "Categoria"
+                
+                val notificationTitle = when {
+                    percentage < 90.0 -> "⚠️ Atenção! Meta atingindo limite"
+                    percentage < 100.0 -> "🟠 Cuidado! Meta próxima do limite"
+                    else -> "🔴 Alerta! Meta estourou"
+                }
+                
+                com.humberto.gestorfinanceiro.utils.NotificationHelper.showGoalAlertNotification(
+                    context = context,
+                    categoryName = categoryName,
+                    percentage = percentage,
+                    spent = totalSpent,
+                    goal = goalValue,
+                    title = notificationTitle
+                )
+                
+                return@withContext listOf(categoryName)
+            } else if (currentThreshold > 0) {
+                Log.d(TAG, "Meta em ${String.format("%.1f", percentage)}% - Faixa ${currentThreshold}% já notificada")
+            }
+            
+            emptyList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao verificar metas", e)
+            emptyList()
         }
     }
     
@@ -253,7 +426,6 @@ class SupabaseRepository(
     suspend fun getGoalByCategory(idCategoria: String, month: Int, year: Int): Goal? = withContext(Dispatchers.IO) {
         try {
             val dataInicio = "%d-%02d-01".format(year, month)
-            Log.d(TAG, "Buscando meta para categoria $idCategoria no período $dataInicio...")
             
             val result = client.postgrest["metas"]
                 .select {
@@ -265,7 +437,6 @@ class SupabaseRepository(
                 }
                 .decodeSingleOrNull<Goal>()
             
-            Log.d(TAG, "Meta encontrada: ${result?.valorMeta}")
             result
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao buscar meta da categoria", e)
@@ -302,6 +473,9 @@ class SupabaseRepository(
                 client.postgrest["metas"].insert(newGoal)
                 Log.d(TAG, "Nova meta criada para categoria $idCategoria")
             }
+            
+            // Invalidar cache de metas
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateGoals()
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao salvar meta", e)
             e.printStackTrace()
@@ -335,8 +509,13 @@ class SupabaseRepository(
         try {
             Log.d(TAG, "Atualizando despesa: $expense")
             val expenseId = expense.idDespesa ?: throw IllegalArgumentException("Expense ID não pode ser null")
+            
+            // Usar modelo de insert para garantir que apenas campos válidos sejam enviados
+            // O ID não precisa ir no corpo pois está no filtro
+            val updateData = expense.toInsertModel()
+            
             val result = client.postgrest["despesas"]
-                .update(expense) {
+                .update(updateData) {
                     filter {
                         eq("id_despesa", expenseId)
                     }
@@ -344,6 +523,10 @@ class SupabaseRepository(
                 }
                 .decodeSingle<Expense>()
             Log.d(TAG, "Despesa atualizada com sucesso: ${result.idDespesa}")
+            
+            // Invalidar cache de despesas
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateExpenses()
+            
             result
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao atualizar despesa", e)
@@ -475,35 +658,34 @@ class SupabaseRepository(
     }
     
     private fun normalizeCategory(category: String): String {
-        // Remove espaços extras, normaliza acentos e converte para minúsculas
-        val trimmed = category.trim()
-        val normalized = Normalizer.normalize(trimmed, Normalizer.Form.NFD)
-        return normalized.replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
+        return Normalizer.normalize(category, Normalizer.Form.NFD)
+            .replace("\\p{InCombiningDiacriticalMarks}+".toRegex(), "")
             .lowercase(Locale.getDefault())
-            .replace("\\s+".toRegex(), " ") // Normaliza espaços múltiplos
+            .trim()
+            .replace("\\s+".toRegex(), " ")
     }
     
     suspend fun getSubcategoryIdByName(categoryName: String, subcategoryName: String): String? = withContext(Dispatchers.IO) {
         try {
-            // Buscar categoria primeiro
-            val categories = getCategoriesList()
+            // Buscar categoria usando CACHE para consistência com a UI
+            val categories = getCategoriesListCached()
             val category = categories.find { 
                 normalizeCategory(it.nomeCategoria ?: "") == normalizeCategory(categoryName)
             }
             
             if (category?.idCategoria == null) {
-                Log.w(TAG, "Categoria '$categoryName' não encontrada")
+                Log.w(TAG, "Categoria '$categoryName' não encontrada no cache")
                 return@withContext null
             }
             
-            // Buscar subcategoria
-            val subcategories = getSubcategoriesList(category.idCategoria)
+            // Buscar subcategoria usando CACHE
+            val subcategories = getSubcategoriesListCached(category.idCategoria)
             val subcategory = subcategories.find { 
                 normalizeCategory(it.nomeSubcategoria ?: "") == normalizeCategory(subcategoryName)
             }
             
             if (subcategory?.idSubcategoria == null) {
-                Log.w(TAG, "Subcategoria '$subcategoryName' não encontrada para categoria '$categoryName'")
+                Log.w(TAG, "Subcategoria '$subcategoryName' não encontrada no cache para categoria '$categoryName'")
             }
             
             subcategory?.idSubcategoria
@@ -513,15 +695,29 @@ class SupabaseRepository(
         }
     }
     
-    suspend fun createExpense(expense: Expense): Expense = withContext(Dispatchers.IO) {
+    suspend fun createExpense(expense: Expense, context: android.content.Context? = null): Expense = withContext(Dispatchers.IO) {
         try {
             Log.d(TAG, "Criando despesa: $expense")
+            
             val result = client.postgrest["despesas"]
                 .insert(expense) {
                     select()
                 }
                 .decodeSingle<Expense>()
             Log.d(TAG, "Despesa criada com sucesso: ${result.idDespesa}")
+            
+            // Invalidar cache de despesas
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateExpenses()
+            
+            // Verificar metas após criar
+            if (context != null) {
+                try {
+                    checkAndNotifyGoals(result, context)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erro ao verificar metas", e)
+                }
+            }
+            
             result
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao criar despesa", e)
@@ -540,6 +736,9 @@ class SupabaseRepository(
                     }
                 }
             Log.d(TAG, "Despesa deletada com sucesso")
+            
+            // Invalidar cache de despesas
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateExpenses()
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao deletar despesa", e)
             e.printStackTrace()
@@ -730,6 +929,8 @@ class SupabaseRepository(
     suspend fun createCategory(category: Category) = withContext(Dispatchers.IO) {
         try {
             client.postgrest["categoria"].insert(category)
+            // Invalidar cache de categorias
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateCategories()
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao criar categoria", e)
             throw e
@@ -741,6 +942,8 @@ class SupabaseRepository(
             client.postgrest["categoria"].update(category) {
                 filter { eq("id_categoria", category.idCategoria!!) }
             }
+            // Invalidar cache de categorias
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateCategories()
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao atualizar categoria", e)
             throw e
@@ -752,6 +955,8 @@ class SupabaseRepository(
             client.postgrest["categoria"].delete {
                 filter { eq("id_categoria", categoryId) }
             }
+            // Invalidar cache de categorias
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateCategories()
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao deletar categoria", e)
             throw e
@@ -761,6 +966,8 @@ class SupabaseRepository(
     suspend fun createSubcategory(subcategory: Subcategory) = withContext(Dispatchers.IO) {
         try {
             client.postgrest["subcategoria"].insert(subcategory)
+            // Invalidar cache de categorias
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateCategories()
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao criar subcategoria", e)
             throw e
@@ -772,6 +979,8 @@ class SupabaseRepository(
             client.postgrest["subcategoria"].update(subcategory) {
                 filter { eq("id_subcategoria", subcategory.idSubcategoria!!) }
             }
+            // Invalidar cache de categorias
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateCategories()
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao atualizar subcategoria", e)
             throw e
@@ -783,6 +992,8 @@ class SupabaseRepository(
             client.postgrest["subcategoria"].delete {
                 filter { eq("id_subcategoria", subcategoryId) }
             }
+            // Invalidar cache de categorias
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateCategories()
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao deletar subcategoria", e)
             throw e
@@ -813,5 +1024,99 @@ class SupabaseRepository(
     @Suppress("UNUSED_PARAMETER")
     suspend fun deleteSubcategory(category: String, subcategory: String) {
         // Deprecated - não faz nada
+    }
+    
+    // ========================================
+    // MÉTODOS COM CACHE PARA PERFORMANCE
+    // ========================================
+    
+    /**
+     * Busca despesas do mês usando cache
+     * Primeira vez: carrega tudo do banco (~1s)
+     * Depois: instantâneo (cache em memória)
+     */
+    suspend fun getExpensesByMonthCached(month: Int, year: Int, sortBy: SortOrder, forceRefresh: Boolean = false): List<Expense> {
+        // Busca do cache (ou servidor se necessário)
+        val allExpenses = com.humberto.gestorfinanceiro.data.cache.DataCache.getExpenses(forceRefresh)
+        
+        // Filtra por mês em memória (rápido)
+        val filter = "%d-%02d".format(year, month)
+        val filtered = allExpenses.filter { it.dataDespesa?.startsWith(filter) == true }
+        
+        // Ordena em memória
+        return when (sortBy) {
+            SortOrder.DATE_DESC -> filtered.sortedByDescending { it.dataDespesa ?: "" }
+            SortOrder.DATE_ASC -> filtered.sortedBy { it.dataDespesa ?: "" }
+            SortOrder.VALUE_DESC -> filtered.sortedByDescending { it.valor ?: 0.0 }
+            SortOrder.VALUE_ASC -> filtered.sortedBy { it.valor ?: 0.0 }
+            SortOrder.NAME_ASC -> filtered.sortedBy { it.local ?: "" }
+            SortOrder.NAME_DESC -> filtered.sortedByDescending { it.local ?: "" }
+            SortOrder.CATEGORY_ASC -> filtered.sortedBy { it.categoria ?: "" }
+            SortOrder.CATEGORY_DESC -> filtered.sortedByDescending { it.categoria ?: "" }
+        }
+    }
+    
+    /**
+     * Busca metas do mês usando cache
+     */
+    suspend fun getGoalsByMonthCached(month: Int, year: Int, forceRefresh: Boolean = false): List<Goal> {
+        val allGoals = com.humberto.gestorfinanceiro.data.cache.DataCache.getGoals(forceRefresh)
+        val allCategories = com.humberto.gestorfinanceiro.data.cache.DataCache.getCategories(forceRefresh)
+        
+        // Filtra por mês
+        val dataInicio = "%d-%02d-01".format(year, month)
+        val filtered = allGoals.filter { 
+            it.dataInicio == dataInicio && it.periodo == "mensal" 
+        }
+        
+        // Enriquece com nome da categoria
+        val categoryMap = allCategories.associateBy { it.idCategoria }
+        return filtered.map { goal ->
+            goal.copy(nomeCategoria = categoryMap[goal.idCategoria]?.nomeCategoria)
+        }
+    }
+    
+    /**
+     * Busca categorias usando cache
+     */
+    suspend fun getCategoriesListCached(forceRefresh: Boolean = false): List<Category> {
+        return com.humberto.gestorfinanceiro.data.cache.DataCache.getCategories(forceRefresh)
+    }
+    
+    /**
+     * Busca subcategorias usando cache
+     */
+    suspend fun getSubcategoriesListCached(categoryId: String? = null, forceRefresh: Boolean = false): List<Subcategory> {
+        val allSubcategories = com.humberto.gestorfinanceiro.data.cache.DataCache.getSubcategories(forceRefresh)
+        
+        return if (categoryId != null) {
+            allSubcategories.filter { it.idCategoria == categoryId }.sortedBy { it.nomeSubcategoria }
+        } else {
+            allSubcategories.sortedBy { it.nomeSubcategoria }
+        }
+    }
+    
+    /**
+     * Busca nomes únicos de categorias do cache
+     */
+    suspend fun getUniqueCategoriesCached(forceRefresh: Boolean = false): List<String> {
+        return getCategoriesListCached(forceRefresh).mapNotNull { it.nomeCategoria }
+    }
+    
+    /**
+     * Busca nomes únicos de subcategorias do cache para uma categoria
+     */
+    suspend fun getUniqueSubcategoriesCached(categoryName: String?, forceRefresh: Boolean = false): List<String> {
+        if (categoryName == null) return emptyList()
+        
+        val allCategories = getCategoriesListCached(forceRefresh)
+        val category = allCategories.find { 
+            normalizeCategory(it.nomeCategoria ?: "") == normalizeCategory(categoryName) 
+        }
+        
+        if (category?.idCategoria == null) return emptyList()
+        
+        return getSubcategoriesListCached(category.idCategoria, forceRefresh)
+            .mapNotNull { it.nomeSubcategoria }
     }
 }

@@ -188,121 +188,125 @@ fun DebugScreen() {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
         // Header
-        Text(
-            text = "Debug - Despesas",
-            style = MaterialTheme.typography.headlineMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
+        Surface(
+            color = MaterialTheme.colorScheme.primaryContainer,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Debug - Despesas",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
         
         // Seção de Configurações SMS
         Card(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = "Configurações SMS",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                
-                Text(
-                    text = "Número do Remetente",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    color = MaterialTheme.colorScheme.primary
                 )
                 
                 OutlinedTextField(
                     value = smsSenderNumber,
                     onValueChange = { smsSenderNumber = it },
-                    label = { Text("Número do banco (ex: 12345)") },
-                    placeholder = { Text("Digite o número do remetente") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    singleLine = true
-                )
-                
-                Text(
-                    text = "Apenas SMS recebidos deste número serão processados. Deixe em branco para processar todos os SMS.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                
-                Row(
+                    label = { Text("Número do Remetente") },
+                    placeholder = { Text("Ex: 29040") },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Button(
-                        onClick = {
-                            val numberToSave = if (smsSenderNumber.isBlank()) null else smsSenderNumber.trim()
-                            SettingsManager.setSmsSenderNumber(numberToSave)
-                            showSaveSuccess = true
-                            
-                            // Log da configuração do número SMS
-                            val configData = JSONObject().apply {
-                                put("number", numberToSave ?: "")
-                                put("action", if (numberToSave == null) "removed" else "saved")
-                            }.toString()
-                            
-                            ActivityLogManager.addLog(
-                                tipoAtividade = "sms_config",
-                                descricao = if (numberToSave == null) 
-                                    "Número SMS removido (processar todos os SMS)" 
-                                else 
-                                    "Número SMS configurado: $numberToSave",
-                                dados = configData,
-                                sucesso = true
-                            )
-                            
-                            scope.launch {
-                                kotlinx.coroutines.delay(2000)
-                                showSaveSuccess = false
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Salvar",
-                            modifier = Modifier.size(18.dp)
+                    singleLine = true,
+                    supportingText = {
+                        Text(
+                            text = "Apenas SMS recebidos deste número serão processados. Deixe em branco para processar todos os SMS.",
+                            style = MaterialTheme.typography.bodySmall
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Salvar")
                     }
+                )
+                
+                Button(
+                    onClick = {
+                        val numberToSave = if (smsSenderNumber.isBlank()) null else smsSenderNumber.trim()
+                        SettingsManager.setSmsSenderNumber(numberToSave)
+                        showSaveSuccess = true
+                        
+                        // Log da configuração do número SMS
+                        val configData = JSONObject().apply {
+                            put("number", numberToSave ?: "")
+                            put("action", if (numberToSave == null) "removed" else "saved")
+                        }.toString()
+                        
+                        ActivityLogManager.addLog(
+                            tipoAtividade = "sms_config",
+                            descricao = if (numberToSave == null) 
+                                "Número SMS removido (processar todos os SMS)" 
+                            else 
+                                "Número SMS configurado: $numberToSave",
+                            dados = configData,
+                            sucesso = true
+                        )
+                        
+                        scope.launch {
+                            kotlinx.coroutines.delay(2000)
+                            showSaveSuccess = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Salvar",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Salvar")
                 }
                 
                 if (showSaveSuccess) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "✓ Configuração salva com sucesso!",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "✓ Configuração salva com sucesso!",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
                 }
                 
                 val currentNumber = SettingsManager.getSmsSenderNumber()
                 if (!currentNumber.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Número atual: $currentNumber",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Número atual: $currentNumber",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
                 }
             }
         }
@@ -312,23 +316,22 @@ fun DebugScreen() {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
+                Text(
+                    text = "Teste de Conexão",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                
+                Button(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Teste de Conexão",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Button(
                         onClick = {
                             scope.launch {
                                 isTestingConnection = true
@@ -364,16 +367,24 @@ fun DebugScreen() {
                                 )
                             }
                         },
-                        enabled = !isTestingConnection
-                    ) {
-                        if (isTestingConnection) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        } else {
-                            Text("Testar Conexão")
-                        }
+                    enabled = !isTestingConnection
+                ) {
+                    if (isTestingConnection) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Testando...")
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Testar",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Testar Conexão")
                     }
                 }
                 
@@ -445,24 +456,18 @@ fun DebugScreen() {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
                     text = "Teste de LLM",
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                
-                Text(
-                    text = "Texto do SMS para Teste",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    color = MaterialTheme.colorScheme.primary
                 )
                 
                 OutlinedTextField(
@@ -470,26 +475,20 @@ fun DebugScreen() {
                     onValueChange = { testSmsText = it },
                     label = { Text("Texto do SMS") },
                     placeholder = { Text("Digite o texto do SMS para testar") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp),
-                    minLines = 3,
-                    maxLines = 5
-                )
-                
-                Text(
-                    text = "Este teste processará o texto com a LLM e salvará o resultado no banco de dados.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(bottom = 12.dp)
-                )
-                
-                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    Button(
-                        onClick = {
+                    minLines = 3,
+                    maxLines = 5,
+                    supportingText = {
+                        Text(
+                            text = "Este teste processará o texto com a LLM e salvará o resultado no banco de dados.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                )
+                
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
                             scope.launch {
                                 isProcessingLlm = true
                                 llmTestResult = null
@@ -527,7 +526,7 @@ fun DebugScreen() {
                                         
                                         if (expense != null) {
                                             // Salvar no banco
-                                            Dependencies.supabaseRepository.saveExpense(expense)
+                                            Dependencies.supabaseRepository.saveExpense(expense, context)
                                             llmTestResult = "Despesa processada e salva com sucesso!\n" +
                                                     "Local: ${expense.local}\n" +
                                                     "Valor: R$ ${String.format("%.2f", expense.valor ?: 0.0)}\n" +
@@ -558,22 +557,24 @@ fun DebugScreen() {
                                 }
                             }
                         },
-                        enabled = !isProcessingLlm && testSmsText.isNotBlank()
-                    ) {
-                        if (isProcessingLlm) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.PlayArrow,
-                                contentDescription = "Processar",
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Processar e Salvar")
-                        }
+                    enabled = !isProcessingLlm && testSmsText.isNotBlank()
+                ) {
+                    if (isProcessingLlm) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Processando...")
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Processar",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Processar e Salvar")
                     }
                 }
                 
@@ -639,10 +640,12 @@ fun DebugScreen() {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .padding(bottom = 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -651,9 +654,9 @@ fun DebugScreen() {
                 ) {
                     Text(
                         text = "Logs de Atividade",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     TextButton(

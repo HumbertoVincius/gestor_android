@@ -11,6 +11,7 @@ data class Expense(
     @SerialName("id_subcategoria") val idSubcategoria: String? = null, // uuid - NOT NULL
     val local: String? = null, // text - nullable (estabelecimento)
     val detalhe: String? = null, // text - nullable
+    val visto: Boolean? = false, // Novo campo: false = não visto/novo
     
     // Campos derivados de JOINs (apenas para exibição, não são inseridos no banco)
     val categoria: String? = null, // vem de join: subcategoria -> categoria
@@ -25,7 +26,8 @@ data class Expense(
             dataDespesa = dataDespesa,
             idSubcategoria = idSubcategoria,
             local = local,
-            detalhe = detalhe
+            detalhe = detalhe,
+            visto = visto
         )
     }
 }
@@ -36,7 +38,8 @@ data class ExpenseInsert(
     @SerialName("data_despesa") val dataDespesa: String? = null,
     @SerialName("id_subcategoria") val idSubcategoria: String? = null,
     val local: String? = null,
-    val detalhe: String? = null
+    val detalhe: String? = null,
+    val visto: Boolean? = false
 )
 
 @Serializable
@@ -47,9 +50,29 @@ data class Goal(
     val periodo: String? = null,
     @SerialName("data_inicio") val dataInicio: String? = null,
     
+    // Novo campo (após migration 005)
+    @SerialName("last_notified_threshold") val lastNotifiedThreshold: Int? = 0,
+    
+    // Campo antigo (compatibilidade com banco antes da migration 005)
+    @SerialName("notified_80_percent") val notified80Percent: Boolean? = null,
+    
     // Campos derivados de JOINs
     @SerialName("nome_categoria") val nomeCategoria: String? = null
-)
+) {
+    // Método auxiliar para obter o threshold correto
+    fun getEffectiveThreshold(): Int {
+        // Se tem o novo campo, usar ele
+        if (lastNotifiedThreshold != null && lastNotifiedThreshold > 0) {
+            return lastNotifiedThreshold
+        }
+        // Se tem o campo antigo marcado como true, assumir 80%
+        if (notified80Percent == true) {
+            return 80
+        }
+        // Nunca notificou
+        return 0
+    }
+}
 
 @Serializable
 data class Category(
