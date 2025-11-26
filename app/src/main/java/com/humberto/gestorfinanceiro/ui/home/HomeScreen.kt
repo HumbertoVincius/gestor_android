@@ -22,18 +22,27 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import android.net.Uri
+import androidx.core.content.ContextCompat
+import android.Manifest
+import android.content.pm.PackageManager
+import com.humberto.gestorfinanceiro.MainActivity
 import com.humberto.gestorfinanceiro.data.model.Expense
 import com.humberto.gestorfinanceiro.data.model.SortOrder
 import com.humberto.gestorfinanceiro.di.Dependencies
+import com.humberto.gestorfinanceiro.ui.expense.CameraExpenseDialog
 import com.humberto.gestorfinanceiro.ui.home.formatCurrency
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -65,7 +74,9 @@ fun HomeScreen(expandedCategory: String? = null) {
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     var searchQuery by remember { mutableStateOf(expandedCategory ?: "") }
     var showOnlyUnseen by remember { mutableStateOf(false) }
+    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     fun markAsSeen(expenseId: String) {
         // Optimistic update: atualiza a lista localmente instantaneamente
@@ -321,6 +332,18 @@ fun HomeScreen(expandedCategory: String? = null) {
     }
 
     // Dialog de criação
+    // Dialog de câmera
+    capturedImageUri?.let { uri ->
+        CameraExpenseDialog(
+            imageUri = uri,
+            onDismiss = { capturedImageUri = null },
+            onExpenseRegistered = { expense ->
+                loadExpenses(forceRefresh = true)
+                capturedImageUri = null
+            }
+        )
+    }
+    
     if (showCreateDialog) {
         CreateExpenseDialog(
             onDismiss = { showCreateDialog = false },
@@ -668,6 +691,7 @@ fun CreateExpenseDialog(
     var subcategories by remember { mutableStateOf<List<String>>(emptyList()) }
     var isLoadingCategories by remember { mutableStateOf(true) }
     var isSaving by remember { mutableStateOf(false) }
+    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     val scope = rememberCoroutineScope()
     
     // Formatar data para exibição
@@ -856,83 +880,163 @@ fun CreateExpenseDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancelar")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
+                    // Botão de câmera
+                    OutlinedButton(
                         onClick = {
-                            scope.launch {
-                                isSaving = true
-                                try {
-                                    // Criar cópias locais para smart cast
-                                    val categoria = selectedCategory
-                                    val subcategoria = selectedSubcategory
-                                    
-                                    if (categoria == null || subcategoria == null) {
-                                        Log.e(TAG, "Categoria e subcategoria são obrigatórias")
-                                        isSaving = false
-                                        return@launch
+                            val mainActivity = MainActivity.getMainActivity(context)
+                            if (mainActivity != null) {
+                                // Verificar permissão de câmera
+                                if (ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.CAMERA
+                                    ) == PackageManager.PERMISSION_GRANTED
+                                ) {
+                                    mainActivity.takePicture { uri ->
+                                        capturedImageUri = uri
                                     }
-                                    
-                                    val valorDouble = valor.toDoubleOrNull() ?: 0.0
-                                    val dataDespesa = "%d-%02d-%02d".format(
-                                        selectedDate.year,
-                                        selectedDate.month,
-                                        selectedDate.day
-                                    )
-                                    
-                                    // Buscar ID da subcategoria
-                                    val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
-                                        categoria,
-                                        subcategoria
-                                    )
-                                    
-                                    if (subcategoriaId == null) {
-                                        Log.e(TAG, "Subcategoria não encontrada")
-                                        isSaving = false
-                                        return@launch
+                                } else {
+                                    mainActivity.requestCameraPermission {
+                                        mainActivity.takePicture { uri ->
+                                            capturedImageUri = uri
+                                        }
                                     }
-                                    
-                                    val newExpense = Expense(
-                                        valor = valorDouble,
-                                        dataDespesa = dataDespesa,
-                                        local = local.ifBlank { null },
-                                        detalhe = null,
-                                        idSubcategoria = subcategoriaId,
-                                        // Campos derivados de JOINs
-                                        categoria = categoria,
-                                        subcategoria = subcategoria,
-                                        visto = true // Despesas criadas manualmente são consideradas vistas
-                                    )
-                                    
-                                    Dependencies.supabaseRepository.createExpense(newExpense, context)
-                                    onExpenseCreated()
-                                } catch (e: Exception) {
-                                    Log.e(TAG, "Erro ao criar despesa", e)
-                                } finally {
-                                    isSaving = false
                                 }
                             }
                         },
-                        enabled = !isSaving && valor.isNotBlank() && local.isNotBlank() && 
-                                  selectedCategory != null && selectedSubcategory != null
+                        enabled = !isSaving
                     ) {
-                        if (isSaving) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                        } else {
-                            Text("Salvar")
+                        Icon(
+                            Icons.Default.Camera,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Câmera")
+                    }
+                    
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("Cancelar")
+                        }
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    isSaving = true
+                                    try {
+                                        // Criar cópias locais para smart cast
+                                        val categoria = selectedCategory
+                                        val subcategoria = selectedSubcategory
+                                        
+                                        if (categoria == null || subcategoria == null) {
+                                            Log.e(TAG, "Categoria e subcategoria são obrigatórias")
+                                            isSaving = false
+                                            return@launch
+                                        }
+                                        
+                                        val valorDouble = valor.toDoubleOrNull() ?: 0.0
+                                        val dataDespesa = "%d-%02d-%02d".format(
+                                            selectedDate.year,
+                                            selectedDate.month,
+                                            selectedDate.day
+                                        )
+                                        
+                                        // Buscar ID da subcategoria
+                                        val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
+                                            categoria,
+                                            subcategoria
+                                        )
+                                        
+                                        if (subcategoriaId == null) {
+                                            Log.e(TAG, "Subcategoria não encontrada")
+                                            isSaving = false
+                                            return@launch
+                                        }
+                                        
+                                        val newExpense = Expense(
+                                            valor = valorDouble,
+                                            dataDespesa = dataDespesa,
+                                            local = local.ifBlank { null },
+                                            detalhe = null,
+                                            idSubcategoria = subcategoriaId,
+                                            // Campos derivados de JOINs
+                                            categoria = categoria,
+                                            subcategoria = subcategoria,
+                                            visto = true // Despesas criadas manualmente são consideradas vistas
+                                        )
+                                        
+                                        Dependencies.supabaseRepository.createExpense(newExpense, context)
+                                        onExpenseCreated()
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Erro ao criar despesa", e)
+                                    } finally {
+                                        isSaving = false
+                                    }
+                                }
+                            },
+                            enabled = !isSaving && valor.isNotBlank() && local.isNotBlank() && 
+                                      selectedCategory != null && selectedSubcategory != null
+                        ) {
+                            if (isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Salvar",
+                                    tint = if (valor.isNotBlank() && local.isNotBlank() && 
+                                               selectedCategory != null && selectedSubcategory != null)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+    }
+    
+    // Dialog de câmera
+    capturedImageUri?.let { uri ->
+        CameraExpenseDialog(
+            imageUri = uri,
+            onDismiss = { capturedImageUri = null },
+            onExpenseRegistered = { expense ->
+                // Preencher campos automaticamente
+                valor = String.format("%.2f", expense.valor ?: 0.0)
+                local = expense.local ?: ""
+                selectedCategory = expense.categoria
+                // Buscar subcategoria correspondente
+                scope.launch {
+                    val allSubcategories = Dependencies.supabaseRepository.getSubcategoriesListCached()
+                    val category = categories.find { it == expense.categoria }
+                    if (category != null) {
+                        val categoryId = Dependencies.supabaseRepository.getCategoriesListCached()
+                            .find { it.nomeCategoria == category }?.idCategoria
+                        if (categoryId != null) {
+                            val subs = allSubcategories
+                                .filter { it.idCategoria == categoryId }
+                                .mapNotNull { it.nomeSubcategoria }
+                                .distinct()
+                                .sorted()
+                            subcategories = subs
+                            selectedSubcategory = expense.subcategoria
+                        }
+                    }
+                }
+                capturedImageUri = null
+            }
+        )
     }
     
     // DatePicker Dialog

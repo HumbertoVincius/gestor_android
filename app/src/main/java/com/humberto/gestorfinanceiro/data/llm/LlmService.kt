@@ -2,6 +2,7 @@ package com.humberto.gestorfinanceiro.data.llm
 
 import com.humberto.gestorfinanceiro.data.log.ActivityLogManager
 import com.humberto.gestorfinanceiro.data.model.Category
+import com.humberto.gestorfinanceiro.data.model.ChatMessage
 import com.humberto.gestorfinanceiro.data.model.Expense
 import com.humberto.gestorfinanceiro.data.model.Subcategory
 import com.humberto.gestorfinanceiro.di.Dependencies
@@ -31,6 +32,12 @@ interface LlmService {
         subcategories: List<Subcategory>,
         categories: List<Category>
     ): Expense?
+    
+    suspend fun chatWithAgent(
+        userMessage: String,
+        context: ChatContext,
+        messageHistory: List<ChatMessage>
+    ): String
 }
 
 @Serializable
@@ -309,6 +316,139 @@ class OpenAILlmService(private val apiKey: String) : LlmService {
             )
             
             null
+        }
+    }
+    
+    override suspend fun chatWithAgent(
+        userMessage: String,
+        context: ChatContext,
+        messageHistory: List<ChatMessage>
+    ): String = withContext(Dispatchers.IO) {
+        try {
+            // Construir contexto financeiro para o agente
+            val categoryMap = context.categories.associateBy { it.idCategoria }
+            val subcategoriesText = context.subcategories.joinToString("\n") { sub ->
+                val categoryName = categoryMap[sub.idCategoria]?.nomeCategoria ?: "Desconhecida"
+                "  - ID: ${sub.idSubcategoria}, Subcategoria: ${sub.nomeSubcategoria}, Categoria: $categoryName"
+            }
+            
+            // Resumo de despesas recentes
+            val recentExpensesText = if (context.recentExpenses.isNotEmpty()) {
+                context.recentExpenses.take(10).joinToString("\n") { expense ->
+                    "  - ${expense.local}: R$ ${String.format("%.2f", expense.valor ?: 0.0)} em ${expense.dataDespesa} (${expense.categoria ?: "N/A"})"
+                }
+            } else {
+                "Nenhuma despesa recente"
+            }
+            
+            // Resumo de metas
+            val goalsText = if (context.currentMonthGoals.isNotEmpty()) {
+                context.currentMonthGoals.joinToString("\n") { goal ->
+                    val categoryName = categoryMap[goal.idCategoria]?.nomeCategoria ?: "Desconhecida"
+                    "  - $categoryName: Meta R$ ${String.format("%.2f", goal.valorMeta ?: 0.0)}"
+                }
+            } else {
+                "Nenhuma meta definida para este mês"
+            }
+            
+            val systemPrompt = """
+Você é um assistente financeiro inteligente que ajuda o usuário a gerenciar suas despesas e entender seus gastos.
+
+SUAS CAPACIDADES:
+1. Cadastrar despesas: Quando o usuário mencionar uma despesa (ex: "Gastei R$50 no supermercado hoje"), você deve extrair as informações e cadastrar. Use o formato JSON para cadastrar despesas.
+2. Responder perguntas sobre dados financeiros: Você tem acesso aos dados do banco e pode responder sobre gastos, metas, categorias, etc.
+3. Fornecer insights e análises sobre os gastos do usuário.
+
+DADOS DISPONÍVEIS:
+- Total gasto este mês (${context.month}/${context.year}): R$ ${String.format("%.2f", context.totalSpentThisMonth)}
+- Despesas recentes:
+$recentExpensesText
+
+- Metas do mês atual:
+$goalsText
+
+- Categorias e Subcategorias disponíveis:
+$subcategoriesText
+
+INSTRUÇÕES PARA CADASTRO DE DESPESAS:
+Quando o usuário mencionar uma despesa, você DEVE:
+1. Identificar: estabelecimento, valor, data (se mencionada, senão use a data atual), e a subcategoria mais apropriada
+2. Retornar APENAS um JSON no formato:
+{
+  "action": "register_expense",
+  "estabelecimento": "nome do estabelecimento",
+  "valor": valor_numerico,
+  "data_despesa": "YYYY-MM-DD",
+  "id_subcategoria": "uuid_da_subcategoria"
+}
+
+IMPORTANTE:
+- Seja conversacional e amigável
+- Use português brasileiro
+- Quando cadastrar uma despesa, confirme ao usuário de forma clara
+- Se não tiver certeza sobre alguma informação, pergunte ao usuário
+- Para perguntas sobre dados, use as informações fornecidas acima
+- Se o usuário pedir algo que você não pode fazer, explique educadamente
+""".trimIndent()
+            
+            // Construir histórico de mensagens
+            val messages = mutableListOf<OpenAIMessage>().apply {
+                add(OpenAIMessage(role = "system", content = systemPrompt))
+                // Adicionar histórico (últimas 10 mensagens para não exceder tokens)
+                messageHistory.takeLast(10).forEach { msg ->
+                    add(OpenAIMessage(role = msg.role, content = msg.content))
+                }
+                // Adicionar mensagem atual do usuário
+                add(OpenAIMessage(role = "user", content = userMessage))
+            }
+            
+            val request = OpenAIRequest(
+                model = "gpt-4o-mini",
+                messages = messages,
+                temperature = 0.7
+            )
+            
+            val httpResponse = httpClient.post("https://api.openai.com/v1/chat/completions") {
+                headers {
+                    append(HttpHeaders.Authorization, "Bearer $apiKey")
+                    contentType(ContentType.Application.Json)
+                }
+                setBody(request)
+            }
+            
+            val response: OpenAIResponse = try {
+                httpResponse.body()
+            } catch (e: JsonConvertException) {
+                val rawResponse = try {
+                    httpResponse.bodyAsText()
+                } catch (ex: Exception) {
+                    "Não foi possível ler a resposta"
+                }
+                
+                val errorMsg = try {
+                    val errorJson = JSONObject(rawResponse)
+                    errorJson.optJSONObject("error")?.optString("message") ?: rawResponse
+                } catch (ex: Exception) {
+                    rawResponse
+                }
+                
+                android.util.Log.e("OpenAILlmService", "Failed to parse OpenAI response: $errorMsg")
+                return@withContext "Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente."
+            }
+            
+            if (response.error != null) {
+                android.util.Log.e("OpenAILlmService", "OpenAI API Error: ${response.error.message}")
+                return@withContext "Desculpe, ocorreu um erro: ${response.error.message}"
+            }
+            
+            val responseText = response.choices?.firstOrNull()?.message?.content 
+                ?: "Desculpe, não consegui processar sua mensagem."
+            
+            responseText
+        } catch (e: Exception) {
+            android.util.Log.e("OpenAILlmService", "Error in chatWithAgent", e)
+            e.printStackTrace()
+            "Desculpe, ocorreu um erro inesperado. Tente novamente mais tarde."
         }
     }
 }
