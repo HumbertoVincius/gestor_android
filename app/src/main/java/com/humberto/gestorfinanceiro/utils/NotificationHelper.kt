@@ -88,6 +88,20 @@ object NotificationHelper {
         
         android.util.Log.d("NotificationHelper", "Texto da notificação: $notificationText")
 
+        // Intent para abrir tela Home (MetasScreen) com categoria expandida
+        val intent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            data = Uri.parse("app://home?category=${Uri.encode(categoria ?: "")}")
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            (categoria ?: "expense").hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         // Criar notificação
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_app_icon_foreground) // Ícone financeiro personalizado
@@ -96,6 +110,7 @@ object NotificationHelper {
             .setStyle(NotificationCompat.BigTextStyle().bigText(notificationText))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
             .build()
 
         // Exibir notificação
@@ -131,7 +146,7 @@ object NotificationHelper {
         val spentText = String.format("R$ %.2f", spent)
         val goalText = String.format("R$ %.2f", goal)
         
-        // Intent para abrir tela HOME com categoria expandida
+        // Intent para abrir tela Home (MetasScreen) com categoria expandida
         val intent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = Uri.parse("app://home?category=${Uri.encode(categoryName)}")

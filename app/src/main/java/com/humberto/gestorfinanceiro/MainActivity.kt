@@ -1,6 +1,7 @@
 package com.humberto.gestorfinanceiro
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -108,6 +109,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent) // Atualizar o intent para que LaunchedEffect possa processá-lo
+    }
 
     private fun checkPermissions() {
         val permissions = mutableListOf(
@@ -145,13 +151,16 @@ fun MainNavigation() {
     
     // Processar deep link do intent
     val context = androidx.compose.ui.platform.LocalContext.current
-    LaunchedEffect(Unit) {
-        val intent = (context as? MainActivity)?.intent
+    val activity = context as? MainActivity
+    
+    // Processar intent inicial e novos intents
+    LaunchedEffect(activity?.intent) {
+        val intent = activity?.intent
         val data = intent?.data
         if (data?.scheme == "app" && data.host == "home") {
             val categoryParam = data.getQueryParameter("category")
-            if (categoryParam != null) {
-                selectedScreen = Screen.HOME
+            if (categoryParam != null && categoryParam.isNotBlank()) {
+                selectedScreen = Screen.METAS // Navegar para tela Home (MetasScreen)
                 expandedCategory = categoryParam
             }
         }
@@ -218,7 +227,7 @@ fun MainNavigation() {
         ) {
             when (selectedScreen) {
                 Screen.HOME -> HomeScreen(expandedCategory = expandedCategory)
-                Screen.METAS -> MetasScreen()
+                Screen.METAS -> MetasScreen(expandedCategory = expandedCategory)
                 Screen.CATEGORIES -> CategoriesScreen()
                 Screen.DEBUG -> DebugScreen()
             }

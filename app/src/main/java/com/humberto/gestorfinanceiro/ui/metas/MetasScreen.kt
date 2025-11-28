@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -120,7 +121,7 @@ enum class MetasSortOrder {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MetasScreen() {
+fun MetasScreen(expandedCategory: String? = null) {
     val calendar = Calendar.getInstance()
     var selectedMonth by remember { mutableIntStateOf(calendar.get(Calendar.MONTH) + 1) }
     var selectedYear by remember { mutableIntStateOf(calendar.get(Calendar.YEAR)) }
@@ -132,6 +133,13 @@ fun MetasScreen() {
     var expandedSubcategories by remember { mutableStateOf<Map<String, Set<String>>>(emptyMap()) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
     val scope = rememberCoroutineScope()
+
+    // Expandir categoria quando receber parâmetro de notificação
+    LaunchedEffect(expandedCategory) {
+        if (expandedCategory != null && expandedCategory.isNotBlank()) {
+            expandedCategories = expandedCategories + expandedCategory
+        }
+    }
 
     fun loadData(forceRefresh: Boolean = false) {
         scope.launch {
@@ -229,16 +237,27 @@ fun MetasScreen() {
         categoryMap.values.toList()
     }
 
-    // Ordenar categorias
-    val sortedCategories = remember(categoriesData, sortOrder) {
-        when (sortOrder) {
-            MetasSortOrder.NAME_ASC -> categoriesData.sortedBy { it.category }
-            MetasSortOrder.NAME_DESC -> categoriesData.sortedByDescending { it.category }
-            MetasSortOrder.VALUE_ASC -> categoriesData.sortedBy { it.realized }
-            MetasSortOrder.VALUE_DESC -> categoriesData.sortedByDescending { it.realized }
-            MetasSortOrder.PERCENTAGE_ASC -> categoriesData.sortedBy { it.percentage }
-            MetasSortOrder.PERCENTAGE_DESC -> categoriesData.sortedByDescending { it.percentage }
-        }
+    // Filtrar apenas categorias com metas para os cards de resumo e ordenar por gasto (maior para menor)
+    val categoriesWithGoals = remember(categoriesData) {
+        categoriesData
+            .filter { it.goal > 0 }
+            .sortedByDescending { it.realized }
+    }
+    
+    // Calcular totais para o card de resumo geral
+    val totalExpenses = remember(expenses) {
+        expenses.sumOf { it.valor ?: 0.0 }
+    }
+    val totalGoals = remember(goals) {
+        goals.sumOf { it.valorMeta?.toDouble() ?: 0.0 }
+    }
+    val totalPercentage = remember(totalExpenses, totalGoals) {
+        calculatePercentage(totalExpenses, totalGoals)
+    }
+
+    // Ordenar categorias para o acompanhamento detalhado (por valor decrescente)
+    val sortedCategories = remember(categoriesData) {
+        categoriesData.sortedByDescending { it.realized }
     }
 
     Scaffold(
@@ -311,84 +330,121 @@ fun MetasScreen() {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Resumo do mês
-                item {
-                    MetasSummaryCard(
-                        totalGasto = expenses.sumOf { it.valor ?: 0.0 },
-                        totalPlanejado = goals.sumOf { it.valorMeta?.toDouble() ?: 0.0 },
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                }
-                
-                // Gráfico de pizza
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp)
-                        ) {
-                            Text(
-                                text = "Distribuição por Categoria",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-                            
-                            // Preparar dados para o gráfico
-                            val pieChartData = sortedCategories
-                                .filter { it.realized > 0 } // Apenas categorias com gastos
-                                .mapIndexed { index, categoryData ->
-                                    PieChartData(
-                                        label = categoryData.category,
-                                        value = categoryData.realized,
-                                        color = pieChartColors[index % pieChartColors.size]
-                                    )
-                                }
-                            
-                            PieChart(data = pieChartData)
-                        }
+                // Card de resumo geral (Total Despesas vs Total Metas)
+                if (totalGoals > 0) {
+                    item {
+                        TotalSummaryCard(
+                            totalExpenses = totalExpenses,
+                            totalGoals = totalGoals,
+                            percentage = totalPercentage
+                        )
                     }
                 }
                 
-                items(sortedCategories, key = { it.category }) { categoryData ->
-                    CategoryCard(
-                        categoryData = categoryData,
-                        isExpanded = expandedCategories.contains(categoryData.category),
-                        onExpandedChange = { expanded ->
-                            expandedCategories = if (expanded) {
-                                expandedCategories + categoryData.category
-                            } else {
-                                expandedCategories - categoryData.category
+                // Cards de resumo das metas (Grid 2 colunas)
+                if (categoriesWithGoals.isNotEmpty()) {
+                    items(
+                        items = categoriesWithGoals.chunked(2),
+                        key = { it.joinToString { cat -> cat.category } }
+                    ) { rowCategories ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            rowCategories.forEach { categoryData ->
+                                GoalSummaryCard(
+                                    categoryData = categoryData,
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
-                        },
-                        expandedSubcategories = expandedSubcategories[categoryData.category] ?: emptySet(),
-                        onSubcategoryExpandedChange = { subcategory, expanded ->
-                            val currentSet = expandedSubcategories[categoryData.category] ?: emptySet()
-                            expandedSubcategories = expandedSubcategories.toMutableMap().apply {
-                                this[categoryData.category] = if (expanded) {
-                                    currentSet + subcategory
-                                } else {
-                                    currentSet - subcategory
-                                }
+                            // Preencher espaço se houver número ímpar de cards
+                            if (rowCategories.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
                             }
-                        },
-                        onEditExpense = { expense ->
-                            editingExpense = expense
-                        },
-                        onDeleteExpense = { expenseId ->
-                            deleteExpense(expenseId)
                         }
-                    )
+                    }
+                }
+
+                // Acompanhamento detalhado das metas
+                if (sortedCategories.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Acompanhamento Detalhado",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
+                        )
+                    }
+                    items(sortedCategories, key = { it.category }) { categoryData ->
+                        CategoryCard(
+                            categoryData = categoryData,
+                            isExpanded = expandedCategories.contains(categoryData.category),
+                            onExpandedChange = { expanded ->
+                                expandedCategories = if (expanded) {
+                                    expandedCategories + categoryData.category
+                                } else {
+                                    expandedCategories - categoryData.category
+                                }
+                            },
+                            expandedSubcategories = expandedSubcategories[categoryData.category] ?: emptySet(),
+                            onSubcategoryExpandedChange = { subcategory, expanded ->
+                                val currentSet = expandedSubcategories[categoryData.category] ?: emptySet()
+                                expandedSubcategories = expandedSubcategories.toMutableMap().apply {
+                                    this[categoryData.category] = if (expanded) {
+                                        currentSet + subcategory
+                                    } else {
+                                        currentSet - subcategory
+                                    }
+                                }
+                            },
+                            onEditExpense = { expense ->
+                                editingExpense = expense
+                            },
+                            onDeleteExpense = { expenseId ->
+                                deleteExpense(expenseId)
+                            }
+                        )
+                    }
+                }
+
+                // Pie Chart
+                if (sortedCategories.isNotEmpty() && sortedCategories.any { it.realized > 0 }) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    text = "Distribuição por Categoria",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+                                
+                                // Preparar dados para o gráfico
+                                val pieChartData = sortedCategories
+                                    .filter { it.realized > 0 } // Apenas categorias com gastos
+                                    .mapIndexed { index, categoryData ->
+                                        PieChartData(
+                                            label = categoryData.category,
+                                            value = categoryData.realized,
+                                            color = pieChartColors[index % pieChartColors.size]
+                                        )
+                                    }
+                                
+                                PieChart(data = pieChartData)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -409,6 +465,95 @@ fun MetasScreen() {
     }
 }
 
+@Composable
+fun TotalSummaryCard(
+    totalExpenses: Double,
+    totalGoals: Double,
+    percentage: Double
+) {
+    val progress = (percentage / 100.0).coerceIn(0.0, 1.0)
+    val progressColor = when {
+        percentage > 100 -> MaterialTheme.colorScheme.error // Vermelho
+        percentage > 80 -> Color(0xFFFFC107) // Amarelo
+        else -> Color(0xFF4CAF50) // Verde
+    }
+    val trackColor = progressColor.copy(alpha = 0.2f)
+    val percentageText = "%.0f%%".format(percentage)
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Coluna 1: Total de Despesas
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Total Despesas",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = formatCurrency(totalExpenses),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            
+            // Indicador circular de progresso no centro
+            Box(
+                modifier = Modifier.size(64.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    progress = progress.toFloat(),
+                    modifier = Modifier.fillMaxSize(),
+                    color = progressColor,
+                    trackColor = trackColor,
+                    strokeWidth = 6.dp
+                )
+                Text(
+                    text = percentageText,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = progressColor
+                )
+            }
+            
+            // Coluna 2: Total de Metas
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Total Metas",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = formatCurrency(totalGoals),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
 data class CategoryData(
     val category: String,
     val goal: Double,
@@ -417,6 +562,85 @@ data class CategoryData(
     val balance: Double,
     val expenses: List<Expense>
 )
+
+@Composable
+fun GoalSummaryCard(
+    categoryData: CategoryData,
+    modifier: Modifier = Modifier
+) {
+    val progress = (categoryData.percentage / 100.0).coerceIn(0.0, 1.0)
+    val progressColor = when {
+        categoryData.percentage > 100 -> MaterialTheme.colorScheme.error // Vermelho
+        categoryData.percentage > 80 -> Color(0xFFFFC107) // Amarelo
+        else -> Color(0xFF4CAF50) // Verde
+    }
+    val trackColor = progressColor.copy(alpha = 0.2f)
+    val percentageText = "%.0f%%".format(categoryData.percentage)
+    
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { /* Pode adicionar navegação aqui se necessário */ },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Indicador circular de progresso
+            Box(
+                modifier = Modifier.size(56.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    progress = progress.toFloat(),
+                    modifier = Modifier.fillMaxSize(),
+                    color = progressColor,
+                    trackColor = trackColor,
+                    strokeWidth = 5.dp
+                )
+                Text(
+                    text = percentageText,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = progressColor
+                )
+            }
+            
+            // Nome da categoria
+            Text(
+                text = categoryData.category,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            
+            // Valores
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                Text(
+                    text = formatCurrency(categoryData.realized),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "de ${formatCurrency(categoryData.goal)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun CategoryCard(

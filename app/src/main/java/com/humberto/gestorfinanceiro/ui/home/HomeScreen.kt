@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.Locale
+import java.util.UUID
 
 private const val TAG = "HomeScreen"
 
@@ -709,18 +710,36 @@ fun CreateExpenseDialog(
     LaunchedEffect(Unit) {
         scope.launch {
             try {
-                // ✅ Usar cache para carregar categorias instantaneamente
-                categories = Dependencies.supabaseRepository.getUniqueCategoriesCached()
-                val allSubcategories = Dependencies.supabaseRepository.getSubcategoriesListCached()
+                android.util.Log.d(TAG, "Iniciando carregamento de categorias...")
+                // Forçar refresh na primeira vez para garantir que temos dados
+                categories = Dependencies.supabaseRepository.getUniqueCategoriesCached(forceRefresh = true)
+                android.util.Log.d(TAG, "Categorias carregadas: ${categories.size}")
+                
+                if (categories.isEmpty()) {
+                    android.util.Log.w(TAG, "Nenhuma categoria encontrada, tentando novamente sem cache...")
+                    // Tentar novamente sem forçar refresh (pode estar no cache de outra tela)
+                    categories = Dependencies.supabaseRepository.getUniqueCategoriesCached(forceRefresh = false)
+                    android.util.Log.d(TAG, "Categorias após segunda tentativa: ${categories.size}")
+                }
+                
+                val allSubcategories = Dependencies.supabaseRepository.getSubcategoriesListCached(forceRefresh = true)
+                android.util.Log.d(TAG, "Subcategorias carregadas: ${allSubcategories.size}")
+                
                 subcategories = allSubcategories
                     .mapNotNull { it.nomeSubcategoria }
                     .filter { it.isNotBlank() }
                     .distinct()
                     .sorted()
+                
+                android.util.Log.d(TAG, "Subcategorias únicas: ${subcategories.size}")
             } catch (e: Exception) {
-                Log.e(TAG, "Erro ao carregar categorias/subcategorias", e)
+                android.util.Log.e(TAG, "Erro ao carregar categorias/subcategorias", e)
+                e.printStackTrace()
+                categories = emptyList()
+                subcategories = emptyList()
             } finally {
                 isLoadingCategories = false
+                android.util.Log.d(TAG, "Carregamento finalizado. Categorias: ${categories.size}, Subcategorias: ${subcategories.size}")
             }
         }
     }
@@ -814,23 +833,61 @@ fun CreateExpenseDialog(
                             .fillMaxWidth()
                             .menuAnchor(),
                         readOnly = true,
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded) }
+                        enabled = !isLoadingCategories && categories.isNotEmpty(),
+                        trailingIcon = { 
+                            if (isLoadingCategories) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                            } else {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
+                            }
+                        },
+                        placeholder = {
+                            if (isLoadingCategories) {
+                                Text("Carregando categorias...")
+                            } else if (categories.isEmpty()) {
+                                Text("Nenhuma categoria disponível")
+                            } else {
+                                Text("Selecione uma categoria")
+                            }
+                        }
                     )
                     ExposedDropdownMenu(
                         expanded = categoryExpanded,
                         onDismissRequest = { categoryExpanded = false }
                     ) {
-                        categories.forEach { category ->
+                        if (isLoadingCategories) {
                             DropdownMenuItem(
-                                text = { Text(category) },
-                                onClick = {
-                                    if (selectedCategory != category) {
-                                        selectedSubcategory = null
+                                text = { 
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                        Text("Carregando...")
                                     }
-                                    selectedCategory = category
-                                    categoryExpanded = false
-                                }
+                                },
+                                onClick = {},
+                                enabled = false
                             )
+                        } else if (categories.isEmpty()) {
+                            DropdownMenuItem(
+                                text = { Text("Nenhuma categoria disponível") },
+                                onClick = {},
+                                enabled = false
+                            )
+                        } else {
+                            categories.forEach { category ->
+                                DropdownMenuItem(
+                                    text = { Text(category) },
+                                    onClick = {
+                                        if (selectedCategory != category) {
+                                            selectedSubcategory = null
+                                        }
+                                        selectedCategory = category
+                                        categoryExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -926,16 +983,35 @@ fun CreateExpenseDialog(
                         }
                         IconButton(
                             onClick = {
+                                // Prevenir múltiplos cliques
+                                if (isSaving) {
+                                    android.util.Log.d(TAG, "Já está salvando, ignorando clique")
+                                    return@IconButton
+                                }
+                                
+                                android.util.Log.d(TAG, "Botão salvar clicado")
+                                android.util.Log.d(TAG, "Valor: $valor, Local: $local, Categoria: $selectedCategory, Subcategoria: $selectedSubcategory")
+                                
+                                // Validar campos antes de processar
+                                if (valor.isBlank() || local.isBlank() || 
+                                    selectedCategory == null || selectedSubcategory == null) {
+                                    android.util.Log.d(TAG, "Campos inválidos")
+                                    return@IconButton
+                                }
+                                
+                                android.util.Log.d(TAG, "Todos os campos válidos, iniciando salvamento")
+                                
                                 scope.launch {
+                                    // Marcar como salvando ANTES de iniciar a corrotina
                                     isSaving = true
+                                    
                                     try {
                                         // Criar cópias locais para smart cast
                                         val categoria = selectedCategory
                                         val subcategoria = selectedSubcategory
                                         
                                         if (categoria == null || subcategoria == null) {
-                                            Log.e(TAG, "Categoria e subcategoria são obrigatórias")
-                                            isSaving = false
+                                            android.util.Log.e(TAG, "Categoria e subcategoria são obrigatórias")
                                             return@launch
                                         }
                                         
@@ -946,6 +1022,8 @@ fun CreateExpenseDialog(
                                             selectedDate.day
                                         )
                                         
+                                        android.util.Log.d(TAG, "Criando despesa: valor=$valorDouble, data=$dataDespesa, local=$local, categoria=$categoria, subcategoria=$subcategoria")
+                                        
                                         // Buscar ID da subcategoria
                                         val subcategoriaId = Dependencies.supabaseRepository.getSubcategoryIdByName(
                                             categoria,
@@ -953,10 +1031,11 @@ fun CreateExpenseDialog(
                                         )
                                         
                                         if (subcategoriaId == null) {
-                                            Log.e(TAG, "Subcategoria não encontrada")
-                                            isSaving = false
+                                            android.util.Log.e(TAG, "Subcategoria não encontrada: categoria=$categoria, subcategoria=$subcategoria")
                                             return@launch
                                         }
+                                        
+                                        android.util.Log.d(TAG, "ID da subcategoria encontrado: $subcategoriaId")
                                         
                                         val newExpense = Expense(
                                             valor = valorDouble,
@@ -970,17 +1049,22 @@ fun CreateExpenseDialog(
                                             visto = true // Despesas criadas manualmente são consideradas vistas
                                         )
                                         
-                                        Dependencies.supabaseRepository.createExpense(newExpense, context)
+                                        android.util.Log.d(TAG, "Salvando despesa no banco...")
+                                        Dependencies.supabaseRepository.saveExpense(newExpense, context)
+                                        android.util.Log.d(TAG, "Despesa salva com sucesso")
+                                        
+                                        // Resetar estado ANTES de chamar o callback
+                                        isSaving = false
+                                        
+                                        // Chamar callback para fechar dialog e recarregar lista
                                         onExpenseCreated()
                                     } catch (e: Exception) {
-                                        Log.e(TAG, "Erro ao criar despesa", e)
-                                    } finally {
+                                        android.util.Log.e(TAG, "Erro ao criar despesa", e)
+                                        e.printStackTrace()
                                         isSaving = false
                                     }
                                 }
-                            },
-                            enabled = !isSaving && valor.isNotBlank() && local.isNotBlank() && 
-                                      selectedCategory != null && selectedSubcategory != null
+                            }
                         ) {
                             if (isSaving) {
                                 CircularProgressIndicator(
@@ -1006,7 +1090,7 @@ fun CreateExpenseDialog(
         }
     }
     
-    // Dialog de câmera
+    // Dialog de câmera (dentro do CreateExpenseDialog)
     capturedImageUri?.let { uri ->
         CameraExpenseDialog(
             imageUri = uri,

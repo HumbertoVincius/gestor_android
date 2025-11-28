@@ -25,6 +25,12 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.json.JSONObject
 import java.util.Calendar
+import android.net.Uri
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.ByteArrayOutputStream
+import android.util.Base64 as AndroidBase64
 
 interface LlmService {
     suspend fun parseSms(
@@ -38,6 +44,13 @@ interface LlmService {
         context: ChatContext,
         messageHistory: List<ChatMessage>
     ): String
+    
+    suspend fun processImageForExpense(
+        imageUri: android.net.Uri,
+        context: android.content.Context,
+        subcategories: List<Subcategory>,
+        categories: List<Category>
+    ): Expense?
 }
 
 @Serializable
@@ -52,6 +65,8 @@ data class OpenAIMessage(
     val role: String,
     val content: String
 )
+
+// Vision API usa JSON manual, não precisa de classes serializáveis
 
 @Serializable
 data class OpenAIResponse(
@@ -449,6 +464,263 @@ IMPORTANTE:
             android.util.Log.e("OpenAILlmService", "Error in chatWithAgent", e)
             e.printStackTrace()
             "Desculpe, ocorreu um erro inesperado. Tente novamente mais tarde."
+        }
+    }
+    
+    override suspend fun processImageForExpense(
+        imageUri: Uri,
+        context: Context,
+        subcategories: List<Subcategory>,
+        categories: List<Category>
+    ): Expense? = withContext(Dispatchers.IO) {
+        try {
+            // Carregar e converter imagem para base64
+            val inputStream = context.contentResolver.openInputStream(imageUri)
+            if (inputStream == null) {
+                android.util.Log.e("OpenAILlmService", "Não foi possível abrir o stream da imagem")
+                return@withContext null
+            }
+            
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            
+            if (bitmap == null) {
+                android.util.Log.e("OpenAILlmService", "Não foi possível decodificar a imagem")
+                return@withContext null
+            }
+            
+            // Redimensionar imagem se muito grande (limite da API é ~20MB, mas vamos manter menor)
+            val maxDimension = 1024
+            val resizedBitmap = if (bitmap.width > maxDimension || bitmap.height > maxDimension) {
+                val scale = minOf(maxDimension.toFloat() / bitmap.width, maxDimension.toFloat() / bitmap.height)
+                val newWidth = (bitmap.width * scale).toInt()
+                val newHeight = (bitmap.height * scale).toInt()
+                Bitmap.createScaledBitmap(bitmap, newWidth, newHeight, true)
+            } else {
+                bitmap
+            }
+            
+            // Converter para base64
+            val outputStream = ByteArrayOutputStream()
+            resizedBitmap.compress(Bitmap.CompressFormat.JPEG, 85, outputStream)
+            val imageBytes = outputStream.toByteArray()
+            val base64Image = AndroidBase64.encodeToString(imageBytes, AndroidBase64.NO_WRAP)
+            
+            // Criar mapa de categorias para lookup rápido
+            val categoryMap = categories.associateBy { it.idCategoria }
+            
+            // Construir lista de subcategorias com suas categorias para o prompt
+            val subcategoriesText = subcategories.joinToString("\n") { sub ->
+                val categoryName = categoryMap[sub.idCategoria]?.nomeCategoria ?: "Desconhecida"
+                "  - ID: ${sub.idSubcategoria}, Subcategoria: ${sub.nomeSubcategoria}, Categoria: $categoryName"
+            }
+            
+            val prompt = """
+Extract the following information from this financial document image (receipt, card slip, invoice, etc.) and return it as a JSON object matching these fields:
+- estabelecimento (string, merchant/establishment name)
+- valor (number, transaction amount, just the numeric value)
+- data_despesa (string, date in format YYYY-MM-DD)
+- id_subcategoria (string UUID, choose the MOST APPROPRIATE subcategory ID from the list below based on the establishment type and transaction context)
+
+AVAILABLE SUBCATEGORIES (choose the best match):
+$subcategoriesText
+
+IMPORTANT: 
+- Analyze the document carefully to determine the best subcategory
+- Examples: supermarket → "Supermercado", restaurant → "Restaurante", gas station → "Combustivel", pharmacy → "Farmacia"
+- If unsure, choose the most general subcategory within the appropriate category
+- ALWAYS include id_subcategoria in your response
+- You MUST choose one of the subcategory IDs from the list above
+
+DATE HANDLING:
+- If the date in document is in format DD/MM (without year), use the CURRENT YEAR
+- If the date in document is in format DD/MM/YYYY, convert to YYYY-MM-DD
+- If no date is found, use the current date
+- Current year is ${Calendar.getInstance().get(Calendar.YEAR)}
+
+Return ONLY a raw JSON object with these 4 fields. Do not wrap it in markdown code blocks or any other formatting.
+""".trimIndent()
+            
+            // Construir requisição Vision manualmente (JSON)
+            val visionRequestJson = JSONObject().apply {
+                put("model", "gpt-4o-mini")
+                put("temperature", 0.2)
+                put("max_tokens", 300)
+                put("messages", org.json.JSONArray().apply {
+                    // System message
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", "You are a financial document analyzer. Extract transaction details from images of receipts, card slips, invoices, or other financial documents. Always return valid JSON only, without any additional text or markdown formatting.")
+                    })
+                    // User message with image
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", org.json.JSONArray().apply {
+                            put(JSONObject().apply {
+                                put("type", "text")
+                                put("text", prompt)
+                            })
+                            put(JSONObject().apply {
+                                put("type", "image_url")
+                                put("image_url", JSONObject().apply {
+                                    put("url", "data:image/jpeg;base64,$base64Image")
+                                })
+                            })
+                        })
+                    })
+                })
+            }
+            
+            // Log de requisição à LLM
+            val requestData = JSONObject().apply {
+                put("model", "gpt-4o-mini")
+                put("image_size", "${resizedBitmap.width}x${resizedBitmap.height}")
+                put("subcategories_count", subcategories.size)
+            }.toString()
+            ActivityLogManager.addLog(
+                tipoAtividade = "llm_request",
+                descricao = "Requisição enviada à LLM Vision para processar imagem",
+                dados = requestData,
+                sucesso = true
+            )
+            
+            val httpResponse = httpClient.post("https://api.openai.com/v1/chat/completions") {
+                headers {
+                    append(HttpHeaders.Authorization, "Bearer $apiKey")
+                    contentType(ContentType.Application.Json)
+                }
+                setBody(visionRequestJson.toString())
+            }
+            
+            // Parse da resposta manualmente
+            val rawResponseText = httpResponse.bodyAsText()
+            val responseJson = JSONObject(rawResponseText)
+            
+            // Verificar se há erro
+            if (responseJson.has("error")) {
+                val errorObj = responseJson.getJSONObject("error")
+                val errorMsg = errorObj.optString("message", "Erro desconhecido")
+                ActivityLogManager.addLog(
+                    tipoAtividade = "llm_response",
+                    descricao = "Erro retornado pela API OpenAI Vision",
+                    dados = JSONObject().apply {
+                        put("error_message", errorMsg)
+                    }.toString(),
+                    sucesso = false,
+                    erro = errorMsg
+                )
+                android.util.Log.e("OpenAILlmService", "OpenAI Vision API Error: $errorMsg")
+                return@withContext null
+            }
+            
+            // Extrair conteúdo da resposta
+            val choices = responseJson.optJSONArray("choices")
+            if (choices == null || choices.length() == 0) {
+                ActivityLogManager.addLog(
+                    tipoAtividade = "llm_response",
+                    descricao = "Resposta vazia da LLM Vision",
+                    dados = requestData,
+                    sucesso = false,
+                    erro = "Resposta da LLM não contém choices"
+                )
+                return@withContext null
+            }
+            
+            val firstChoice = choices.getJSONObject(0)
+            val message = firstChoice.getJSONObject("message")
+            val responseText = message.optString("content", "")
+            
+            if (responseText.isBlank()) {
+                ActivityLogManager.addLog(
+                    tipoAtividade = "llm_response",
+                    descricao = "Resposta vazia da LLM Vision",
+                    dados = requestData,
+                    sucesso = false,
+                    erro = "Resposta da LLM não contém conteúdo"
+                )
+                return@withContext null
+            }
+            
+            // Log de resposta da LLM
+            val responseData = JSONObject().apply {
+                put("response_text", responseText.take(500))
+                put("model", "gpt-4o-mini")
+            }.toString()
+            ActivityLogManager.addLog(
+                tipoAtividade = "llm_response",
+                descricao = "Resposta recebida da LLM Vision",
+                dados = responseData,
+                sucesso = true
+            )
+            
+            // Parse JSON response - remover possível formatação markdown
+            val jsonString = responseText.trim()
+                .removePrefix("```json")
+                .removePrefix("```")
+                .removeSuffix("```")
+                .trim()
+            
+            val jsonObj = JSONObject(jsonString)
+            
+            // Get subcategory ID from response
+            val subcategoriaId = jsonObj.optString("id_subcategoria")
+            
+            // Verify that the subcategory ID is valid
+            val subcategory = subcategories.find { it.idSubcategoria == subcategoriaId }
+            if (subcategory == null) {
+                android.util.Log.w("OpenAILlmService", "Invalid subcategory ID returned by LLM Vision: $subcategoriaId")
+                
+                ActivityLogManager.addLog(
+                    tipoAtividade = "llm_response",
+                    descricao = "Subcategoria inválida retornada pela LLM Vision",
+                    dados = responseData,
+                    sucesso = false,
+                    erro = "Subcategoria ID inválido: $subcategoriaId"
+                )
+                
+                return@withContext null
+            }
+            
+            // Get category name for the selected subcategory
+            val category = categoryMap[subcategory.idCategoria]
+            
+            // Get date or use current date
+            val dataDespesa = jsonObj.optString("data_despesa").ifBlank {
+                val calendar = Calendar.getInstance()
+                "%d-%02d-%02d".format(
+                    calendar.get(Calendar.YEAR),
+                    calendar.get(Calendar.MONTH) + 1,
+                    calendar.get(Calendar.DAY_OF_MONTH)
+                )
+            }
+            
+            Expense(
+                valor = jsonObj.optDouble("valor", 0.0),
+                dataDespesa = dataDespesa,
+                local = jsonObj.optString("estabelecimento", "Desconhecido"),
+                idSubcategoria = subcategoriaId,
+                detalhe = null,
+                // Campos derivados de JOINs (para exibição)
+                categoria = category?.nomeCategoria,
+                subcategoria = subcategory.nomeSubcategoria
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("OpenAILlmService", "Error processing image", e)
+            e.printStackTrace()
+            
+            val errorData = JSONObject().apply {
+                put("error_type", e.javaClass.simpleName)
+                put("error_message", e.message ?: "Erro desconhecido")
+            }.toString()
+            ActivityLogManager.addLog(
+                tipoAtividade = "llm_request",
+                descricao = "Erro ao processar imagem com LLM Vision",
+                dados = errorData,
+                sucesso = false,
+                erro = e.message ?: "Erro desconhecido"
+            )
+            
+            null
         }
     }
 }

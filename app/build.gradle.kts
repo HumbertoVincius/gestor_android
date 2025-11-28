@@ -99,12 +99,10 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:2.3.7")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
+    implementation("io.ktor:ktor-client-logging:2.3.7")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    
-    // Google ML Kit for Text Recognition
-    implementation("com.google.mlkit:text-recognition:16.0.0")
     
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.5.0")

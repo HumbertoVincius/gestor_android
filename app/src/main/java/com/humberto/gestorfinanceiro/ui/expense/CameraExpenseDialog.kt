@@ -17,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import coil.compose.rememberAsyncImagePainter
 import com.humberto.gestorfinanceiro.MainActivity
-import com.humberto.gestorfinanceiro.data.ocr.ImageTextExtractor
 import com.humberto.gestorfinanceiro.data.model.Expense
 import com.humberto.gestorfinanceiro.di.Dependencies
 import kotlinx.coroutines.launch
@@ -34,7 +33,6 @@ fun CameraExpenseDialog(
     val scope = rememberCoroutineScope()
     
     var isProcessing by remember { mutableStateOf(false) }
-    var extractedText by remember { mutableStateOf<String?>(null) }
     var processingError by remember { mutableStateOf<String?>(null) }
     
     if (imageUri == null) {
@@ -88,31 +86,6 @@ fun CameraExpenseDialog(
                     )
                 }
                 
-                // Texto extraído (se disponível)
-                extractedText?.let { text ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp)
-                        ) {
-                            Text(
-                                text = "Texto Extraído:",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = text,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-                
                 // Erro
                 processingError?.let { error ->
                     Card(
@@ -148,22 +121,8 @@ fun CameraExpenseDialog(
                             scope.launch {
                                 isProcessing = true
                                 processingError = null
-                                extractedText = null
                                 
                                 try {
-                                    // Extrair texto da imagem
-                                    val textExtractor = ImageTextExtractor(context)
-                                    val text = textExtractor.extractTextFromImage(imageUri)
-                                    textExtractor.close()
-                                    
-                                    if (text.isNullOrBlank()) {
-                                        processingError = "Não foi possível extrair texto da imagem. Tente novamente com uma foto mais nítida."
-                                        isProcessing = false
-                                        return@launch
-                                    }
-                                    
-                                    extractedText = text
-                                    
                                     // Buscar categorias e subcategorias
                                     val subcategories = Dependencies.supabaseRepository.getSubcategoriesListCached()
                                     val categories = Dependencies.supabaseRepository.getCategoriesListCached()
@@ -174,8 +133,13 @@ fun CameraExpenseDialog(
                                         return@launch
                                     }
                                     
-                                    // Processar texto com LLM
-                                    val expense = Dependencies.llmService.parseSms(text, subcategories, categories)
+                                    // Processar imagem diretamente com LLM Vision
+                                    val expense = Dependencies.llmService.processImageForExpense(
+                                        imageUri,
+                                        context,
+                                        subcategories,
+                                        categories
+                                    )
                                     
                                     if (expense != null) {
                                         // Salvar no banco
