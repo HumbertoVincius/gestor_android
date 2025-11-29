@@ -352,7 +352,7 @@ fun MetasScreen(expandedCategory: String? = null) {
                     ) { rowCategories ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             rowCategories.forEach { categoryData ->
                                 GoalSummaryCard(
@@ -569,32 +569,72 @@ fun GoalSummaryCard(
     modifier: Modifier = Modifier
 ) {
     val progress = (categoryData.percentage / 100.0).coerceIn(0.0, 1.0)
-    val progressColor = when {
-        categoryData.percentage > 100 -> MaterialTheme.colorScheme.error // Vermelho
-        categoryData.percentage > 80 -> Color(0xFFFFC107) // Amarelo
-        else -> Color(0xFF4CAF50) // Verde
+    
+    // Cor de fundo baseada no progresso usando paleta do Material Theme
+    val (cardColor, onCardColor) = when {
+        categoryData.percentage > 100 -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+        categoryData.percentage > 80 -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
     }
-    val trackColor = progressColor.copy(alpha = 0.2f)
+    
+    // Cor do progresso circular (usando a cor do texto do card)
+    val progressColor = onCardColor
+    val trackColor = onCardColor.copy(alpha = 0.3f)
     val percentageText = "%.0f%%".format(categoryData.percentage)
+    
+    // Calcular texto de progresso (ex: "R$ 418 / R$ 1.000") sem casas decimais
+    val completedText = buildString {
+        val symbols = java.text.DecimalFormatSymbols(Locale("pt", "BR")).apply {
+            groupingSeparator = '.'
+        }
+        val formatter = java.text.DecimalFormat("#,##0", symbols)
+        append("R$ ${formatter.format(categoryData.realized)}")
+        append(" / ")
+        append("R$ ${formatter.format(categoryData.goal)}")
+    }
     
     Card(
         modifier = modifier
             .fillMaxWidth()
             .clickable { /* Pode adicionar navegação aqui se necessário */ },
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            containerColor = cardColor
+        ),
+        shape = MaterialTheme.shapes.medium
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Indicador circular de progresso
+            // Coluna esquerda: Textos (categoria e valores)
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                // Primeira linha: Nome da categoria
+                Text(
+                    text = categoryData.category,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = onCardColor,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                
+                // Segunda linha: Valores
+                Text(
+                    text = completedText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = onCardColor.copy(alpha = 0.9f)
+                )
+            }
+            
+            // Coluna direita: Indicador circular (centralizado verticalmente)
             Box(
-                modifier = Modifier.size(56.dp),
+                modifier = Modifier.size(48.dp),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(
@@ -602,40 +642,13 @@ fun GoalSummaryCard(
                     modifier = Modifier.fillMaxSize(),
                     color = progressColor,
                     trackColor = trackColor,
-                    strokeWidth = 5.dp
+                    strokeWidth = 4.dp
                 )
                 Text(
                     text = percentageText,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = progressColor
-                )
-            }
-            
-            // Nome da categoria
-            Text(
-                text = categoryData.category,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            
-            // Valores
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(1.dp)
-            ) {
-                Text(
-                    text = formatCurrency(categoryData.realized),
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "de ${formatCurrency(categoryData.goal)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = onCardColor
                 )
             }
         }
