@@ -62,7 +62,7 @@ fun MetasSummaryCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(24.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -132,11 +132,14 @@ fun MetasScreen(expandedCategory: String? = null) {
     var expandedCategories by remember { mutableStateOf<Set<String>>(emptySet()) }
     var expandedSubcategories by remember { mutableStateOf<Map<String, Set<String>>>(emptyMap()) }
     var editingExpense by remember { mutableStateOf<Expense?>(null) }
+    var showCopyDialog by remember { mutableStateOf(false) }
+    var isCopying by remember { mutableStateOf(false) }
+    var copyResultMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     // Expandir categoria quando receber parâmetro de notificação
     LaunchedEffect(expandedCategory) {
-        if (expandedCategory != null && expandedCategory.isNotBlank()) {
+        if (expandedCategory != null && expandedCategory.isNotBlank() && !expandedCategories.contains(expandedCategory)) {
             expandedCategories = expandedCategories + expandedCategory
         }
     }
@@ -147,15 +150,25 @@ fun MetasScreen(expandedCategory: String? = null) {
             try {
                 // ✅ Usar cache e buscar em paralelo
                 val goalsDeferred = async {
-                    Dependencies.supabaseRepository.getGoalsByMonthCached(selectedMonth, selectedYear, forceRefresh)
+                    try {
+                        Dependencies.supabaseRepository.getGoalsByMonthCached(selectedMonth, selectedYear, forceRefresh)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Erro ao buscar metas", e)
+                        emptyList<Goal>()
+                    }
                 }
                 val expensesDeferred = async {
-                    Dependencies.supabaseRepository.getExpensesByMonthCached(
-                        selectedMonth,
-                        selectedYear,
-                        com.humberto.gestorfinanceiro.data.model.SortOrder.DATE_DESC,
-                        forceRefresh
-                    )
+                    try {
+                        Dependencies.supabaseRepository.getExpensesByMonthCached(
+                            selectedMonth,
+                            selectedYear,
+                            com.humberto.gestorfinanceiro.data.model.SortOrder.DATE_DESC,
+                            forceRefresh
+                        )
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Erro ao buscar despesas", e)
+                        emptyList<Expense>()
+                    }
                 }
                 
                 // Aguardar ambos terminarem (paralelo!)
@@ -187,7 +200,14 @@ fun MetasScreen(expandedCategory: String? = null) {
     }
 
     LaunchedEffect(selectedMonth, selectedYear) {
-        loadData()
+        try {
+            loadData()
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro no LaunchedEffect ao carregar dados", e)
+            isLoading = false
+            goals = emptyList()
+            expenses = emptyList()
+        }
     }
     
 
@@ -198,69 +218,117 @@ fun MetasScreen(expandedCategory: String? = null) {
 
     // Criar lista de categorias com dados agregados
     val categoriesData = remember(goals, expensesByCategory) {
-        val categoryMap = mutableMapOf<String, CategoryData>()
-        
-        // Adicionar categorias que têm metas
-        goals.forEach { goal ->
-            val category = goal.nomeCategoria ?: return@forEach
-            val categoryExpenses = expensesByCategory[category] ?: emptyList()
-            val total = calculateCategoryTotal(categoryExpenses)
-            val goalValue = goal.valorMeta ?: 0.0
-            val percentage = calculatePercentage(total, goalValue)
-            val balance = calculateBalance(goalValue, total)
+        try {
+            val categoryMap = mutableMapOf<String, CategoryData>()
             
-            categoryMap[category] = CategoryData(
-                category = category,
-                goal = goalValue,
-                realized = total,
-                percentage = percentage,
-                balance = balance,
-                expenses = categoryExpenses
-            )
-        }
-        
-        // Adicionar categorias que têm despesas mas não têm meta
-        expensesByCategory.forEach { (category, categoryExpenses) ->
-            if (!categoryMap.containsKey(category)) {
-                val total = calculateCategoryTotal(categoryExpenses)
-                categoryMap[category] = CategoryData(
-                    category = category,
-                    goal = 0.0,
-                    realized = total,
-                    percentage = 0.0,
-                    balance = -total,
-                    expenses = categoryExpenses
-                )
+            // Adicionar categorias que têm metas
+            goals.forEach { goal ->
+                try {
+                    val category = goal.nomeCategoria ?: return@forEach
+                    val categoryExpenses = expensesByCategory[category] ?: emptyList()
+                    val total = calculateCategoryTotal(categoryExpenses)
+                    val safeTotal = if (total.isNaN() || total.isInfinite()) 0.0 else total
+                    val goalValue = goal.valorMeta ?: 0.0
+                    val safeGoalValue = if (goalValue.isNaN() || goalValue.isInfinite()) 0.0 else goalValue
+                    val percentage = calculatePercentage(safeTotal, safeGoalValue)
+                    val balance = calculateBalance(safeGoalValue, safeTotal)
+                    
+                    categoryMap[category] = CategoryData(
+                        category = category,
+                        goal = safeGoalValue,
+                        realized = safeTotal,
+                        percentage = percentage,
+                        balance = balance,
+                        expenses = categoryExpenses
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erro ao processar meta da categoria ${goal.nomeCategoria}", e)
+                }
             }
+            
+            // Adicionar categorias que têm despesas mas não têm meta
+            expensesByCategory.forEach { (category, categoryExpenses) ->
+                try {
+                    if (!categoryMap.containsKey(category)) {
+                        val total = calculateCategoryTotal(categoryExpenses)
+                        val safeTotal = if (total.isNaN() || total.isInfinite()) 0.0 else total
+                        categoryMap[category] = CategoryData(
+                            category = category,
+                            goal = 0.0,
+                            realized = safeTotal,
+                            percentage = 0.0,
+                            balance = -safeTotal,
+                            expenses = categoryExpenses
+                        )
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erro ao processar categoria $category", e)
+                }
+            }
+            
+            categoryMap.values.toList()
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao criar dados de categorias", e)
+            emptyList()
         }
-        
-        categoryMap.values.toList()
     }
 
     // Filtrar apenas categorias com metas para os cards de resumo e ordenar por gasto (maior para menor)
     val categoriesWithGoals = remember(categoriesData) {
-        categoriesData
-            .filter { it.goal > 0 }
-            .sortedByDescending { it.realized }
+        try {
+            categoriesData
+                .filter { it.goal > 0 }
+                .sortedByDescending { it.realized }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao filtrar categorias com metas", e)
+            emptyList()
+        }
     }
     
     // Calcular totais para o card de resumo geral
     val totalExpenses = remember(expenses) {
-        expenses.sumOf { it.valor ?: 0.0 }
+        try {
+            val sum = expenses.sumOf { it.valor ?: 0.0 }
+            if (sum.isNaN() || sum.isInfinite()) 0.0 else sum
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao calcular total de despesas", e)
+            0.0
+        }
     }
     val totalGoals = remember(goals) {
-        goals.sumOf { it.valorMeta?.toDouble() ?: 0.0 }
+        try {
+            val sum = goals.sumOf { it.valorMeta?.toDouble() ?: 0.0 }
+            if (sum.isNaN() || sum.isInfinite()) 0.0 else sum
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao calcular total de metas", e)
+            0.0
+        }
     }
     val totalPercentage = remember(totalExpenses, totalGoals) {
-        calculatePercentage(totalExpenses, totalGoals)
+        try {
+            calculatePercentage(totalExpenses, totalGoals)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao calcular porcentagem total", e)
+            0.0
+        }
     }
 
     // Ordenar categorias para o acompanhamento detalhado (por valor decrescente)
     val sortedCategories = remember(categoriesData) {
-        categoriesData.sortedByDescending { it.realized }
+        try {
+            categoriesData.sortedByDescending { it.realized }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao ordenar categorias", e)
+            emptyList()
+        }
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         topBar = {
             TopAppBar(
                 title = { 
@@ -307,6 +375,11 @@ fun MetasScreen(expandedCategory: String? = null) {
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = "Atualizar")
                         }
+                        IconButton(
+                            onClick = { showCopyDialog = true }
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copiar metas do mês anterior")
+                        }
                         MetasSortOrderSelector(
                             currentSort = sortOrder,
                             onSortChanged = { sortOrder = it }
@@ -330,12 +403,12 @@ fun MetasScreen(expandedCategory: String? = null) {
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Card de resumo geral (Total Despesas vs Total Metas)
                 if (totalGoals > 0) {
-                    item {
+                    item(key = "total_summary_card") {
                         TotalSummaryCard(
                             totalExpenses = totalExpenses,
                             totalGoals = totalGoals,
@@ -348,11 +421,14 @@ fun MetasScreen(expandedCategory: String? = null) {
                 if (categoriesWithGoals.isNotEmpty()) {
                     items(
                         items = categoriesWithGoals.chunked(2),
-                        key = { it.joinToString { cat -> cat.category } }
+                        key = { row -> 
+                            // Criar key única e estável baseada nos índices
+                            row.mapIndexed { index, cat -> "${index}_${cat.category}_${cat.goal}" }.joinToString("_")
+                        }
                     ) { rowCategories ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             rowCategories.forEach { categoryData ->
                                 GoalSummaryCard(
@@ -370,7 +446,7 @@ fun MetasScreen(expandedCategory: String? = null) {
 
                 // Acompanhamento detalhado das metas
                 if (sortedCategories.isNotEmpty()) {
-                    item {
+                    item(key = "acompanhamento_header") {
                         Text(
                             text = "Acompanhamento Detalhado",
                             style = MaterialTheme.typography.titleLarge,
@@ -378,7 +454,13 @@ fun MetasScreen(expandedCategory: String? = null) {
                             modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)
                         )
                     }
-                    items(sortedCategories, key = { it.category }) { categoryData ->
+                    items(
+                        items = sortedCategories,
+                        key = { cat -> 
+                            // Criar key única e estável combinando categoria com valores
+                            "${cat.category}_${cat.goal}_${cat.realized}"
+                        }
+                    ) { categoryData ->
                         CategoryCard(
                             categoryData = categoryData,
                             isExpanded = expandedCategories.contains(categoryData.category),
@@ -391,8 +473,8 @@ fun MetasScreen(expandedCategory: String? = null) {
                             },
                             expandedSubcategories = expandedSubcategories[categoryData.category] ?: emptySet(),
                             onSubcategoryExpandedChange = { subcategory, expanded ->
-                                val currentSet = expandedSubcategories[categoryData.category] ?: emptySet()
                                 expandedSubcategories = expandedSubcategories.toMutableMap().apply {
+                                    val currentSet = this[categoryData.category] ?: emptySet()
                                     this[categoryData.category] = if (expanded) {
                                         currentSet + subcategory
                                     } else {
@@ -412,7 +494,7 @@ fun MetasScreen(expandedCategory: String? = null) {
 
                 // Pie Chart
                 if (sortedCategories.isNotEmpty() && sortedCategories.any { it.realized > 0 }) {
-                    item {
+                    item(key = "pie_chart_card") {
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surface
@@ -463,6 +545,88 @@ fun MetasScreen(expandedCategory: String? = null) {
             defaultYear = selectedYear
         )
     }
+    
+    // Mostrar Snackbar com resultado da cópia
+    copyResultMessage?.let { message ->
+        LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short
+            )
+            kotlinx.coroutines.delay(3000)
+            copyResultMessage = null
+        }
+    }
+    
+    // Dialog de confirmação para copiar metas
+    if (showCopyDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!isCopying) showCopyDialog = false },
+            title = { Text("Copiar Metas do Mês Anterior") },
+            text = {
+                val previousMonth = if (selectedMonth == 1) 12 else selectedMonth - 1
+                val previousYear = if (selectedMonth == 1) selectedYear - 1 else selectedYear
+                Column {
+                    Text("Deseja copiar todas as metas de ${getMonthYearString(previousMonth, previousYear)} para ${getMonthYearString(selectedMonth, selectedYear)}?")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "As metas que já existem no mês atual não serão sobrescritas.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            isCopying = true
+                            try {
+                                val copiedCount = Dependencies.supabaseRepository.copyGoalsFromPreviousMonth(
+                                    selectedMonth,
+                                    selectedYear
+                                )
+                                isCopying = false
+                                showCopyDialog = false
+                                
+                                // Mostrar mensagem de sucesso
+                                if (copiedCount > 0) {
+                                    copyResultMessage = "$copiedCount meta(s) copiada(s) com sucesso!"
+                                    // Recarregar dados
+                                    loadData(forceRefresh = true)
+                                } else {
+                                    copyResultMessage = "Nenhuma meta foi copiada. Verifique se há metas no mês anterior."
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Erro ao copiar metas", e)
+                                isCopying = false
+                                showCopyDialog = false
+                                copyResultMessage = "Erro ao copiar metas: ${e.message}"
+                            }
+                        }
+                    },
+                    enabled = !isCopying
+                ) {
+                    if (isCopying) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text("Copiar")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showCopyDialog = false },
+                    enabled = !isCopying
+                ) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -471,25 +635,33 @@ fun TotalSummaryCard(
     totalGoals: Double,
     percentage: Double
 ) {
-    val progress = (percentage / 100.0).coerceIn(0.0, 1.0)
-    val progressColor = when {
-        percentage > 100 -> MaterialTheme.colorScheme.error // Vermelho
-        percentage > 80 -> Color(0xFFFFC107) // Amarelo
-        else -> Color(0xFF4CAF50) // Verde
+    // Proteção contra valores inválidos
+    val safePercentage = if (percentage.isNaN() || percentage.isInfinite()) 0.0 else percentage
+    val progress = (safePercentage / 100.0).coerceIn(0.0, 1.0)
+    
+    // Cor de fundo baseada no progresso usando paleta do Material Theme (igual aos outros cards)
+    val (cardColor, onCardColor) = when {
+        safePercentage > 100 -> MaterialTheme.colorScheme.errorContainer to MaterialTheme.colorScheme.onErrorContainer
+        safePercentage > 80 -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+        else -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
     }
-    val trackColor = progressColor.copy(alpha = 0.2f)
-    val percentageText = "%.0f%%".format(percentage)
+    
+    // Cor do progresso circular (usando a cor do texto do card)
+    val progressColor = onCardColor
+    val trackColor = onCardColor.copy(alpha = 0.3f)
+    val percentageText = "%.0f%%".format(safePercentage)
     
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
+            containerColor = cardColor
+        ),
+        shape = MaterialTheme.shapes.medium
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(20.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -497,24 +669,24 @@ fun TotalSummaryCard(
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = "Total Despesas",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = onCardColor.copy(alpha = 0.7f)
                 )
                 Text(
                     text = formatCurrency(totalExpenses),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = onCardColor
                 )
             }
             
             // Indicador circular de progresso no centro
             Box(
-                modifier = Modifier.size(64.dp),
+                modifier = Modifier.size(72.dp),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(
@@ -536,18 +708,18 @@ fun TotalSummaryCard(
             Column(
                 modifier = Modifier.weight(1f),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = "Total Metas",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = onCardColor.copy(alpha = 0.7f)
                 )
                 Text(
                     text = formatCurrency(totalGoals),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = onCardColor
                 )
             }
         }
@@ -605,14 +777,14 @@ fun GoalSummaryCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(18.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Coluna esquerda: Textos (categoria e valores)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 // Primeira linha: Nome da categoria
                 Text(
@@ -634,7 +806,7 @@ fun GoalSummaryCard(
             
             // Coluna direita: Indicador circular (centralizado verticalmente)
             Box(
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(56.dp),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(
@@ -676,7 +848,7 @@ fun CategoryCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(20.dp)
         ) {
             // Header da categoria
             Row(
@@ -689,12 +861,12 @@ fun CategoryCard(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Ícone circular com primeira letra
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(56.dp)
                             .background(
                                 MaterialTheme.colorScheme.primaryContainer,
                                 shape = CircleShape
@@ -752,7 +924,7 @@ fun CategoryCard(
             
             // Barra de progresso
             if (categoryData.goal > 0) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 val progress = (categoryData.percentage / 100.0).coerceIn(0.0, 1.0)
                 val progressColor = when {
                     categoryData.percentage > 100 -> MaterialTheme.colorScheme.error
@@ -770,7 +942,7 @@ fun CategoryCard(
             
             // Conteúdo expandido
             if (isExpanded) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(20.dp))
                 
                 if (subcategories.isEmpty()) {
                     // Mostrar transações diretamente se não houver subcategorias
@@ -782,7 +954,7 @@ fun CategoryCard(
                         text = "Transações (${sortedExpenses.size}):",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 12.dp)
                     )
                     sortedExpenses.forEach { expense ->
                         TransactionItem(
@@ -790,7 +962,7 @@ fun CategoryCard(
                             onEditClick = { onEditExpense(expense) },
                             onDeleteClick = { expense.idDespesa?.let { onDeleteExpense(it) } }
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
                 } else {
                     // Mostrar subcategorias ordenadas por valor (maior para menor)
@@ -808,7 +980,7 @@ fun CategoryCard(
                             onEditExpense = onEditExpense,
                             onDeleteExpense = onDeleteExpense
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                     }
                 }
             }
@@ -836,7 +1008,7 @@ fun SubcategoryCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(16.dp)
         ) {
             Row(
                 modifier = Modifier
@@ -868,7 +1040,7 @@ fun SubcategoryCard(
             }
             
             if (isExpanded) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 // Ordenar transações por data (mais recente primeiro)
                 val sortedExpenses = expenses.sortedWith(
                     compareByDescending<Expense> { it.dataDespesa ?: "" }
@@ -877,7 +1049,7 @@ fun SubcategoryCard(
                     text = "Transações (${sortedExpenses.size}):",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
                 sortedExpenses.forEach { expense ->
                     TransactionItem(
@@ -885,7 +1057,7 @@ fun SubcategoryCard(
                         onEditClick = { onEditExpense(expense) },
                         onDeleteClick = { expense.idDespesa?.let { onDeleteExpense(it) } }
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
             }
         }
@@ -907,7 +1079,7 @@ fun TransactionItem(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {

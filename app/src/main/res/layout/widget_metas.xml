@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@android:color/white">
+
+    <!-- Header com mês/ano -->
+    <TextView
+        android:id="@+id/widget_month_year"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Janeiro 2024"
+        android:textSize="12sp"
+        android:textColor="#666666"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Card de Resumo Geral -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#E3F2FD"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp"
+        android:gravity="center_vertical">
+
+        <!-- Total Despesas -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Total Despesas"
+                android:textSize="10sp"
+                android:textColor="#666666"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/widget_total_expenses"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="R$ 0,00"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#1976D2" />
+        </LinearLayout>
+
+        <!-- Indicador de Progresso -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:layout_marginHorizontal="16dp">
+
+            <TextView
+                android:id="@+id/widget_percentage"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0%"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#1976D2"
+                android:layout_marginBottom="4dp" />
+
+            <ProgressBar
+                android:id="@+id/widget_progress_bar"
+                style="@android:style/Widget.ProgressBar.Horizontal"
+                android:layout_width="60dp"
+                android:layout_height="8dp"
+                android:max="100"
+                android:progress="0"
+                android:indeterminate="false" />
+        </LinearLayout>
+
+        <!-- Total Metas -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Total Metas"
+                android:textSize="10sp"
+                android:textColor="#666666"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/widget_total_goals"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="R$ 0,00"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#1976D2" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Cards de Categorias (Horizontal Scroll) -->
+    <HorizontalScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <!-- Card Categoria 1 -->
+            <LinearLayout
+                android:id="@+id/widget_category_card_1"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#E3F2FD"
+                android:padding="10dp"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/widget_category_name_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Categoria"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_value_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="R$ 0 / R$ 0"
+                    android:textSize="9sp"
+                    android:textColor="#666666"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_percentage_1"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Card Categoria 2 -->
+            <LinearLayout
+                android:id="@+id/widget_category_card_2"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#E3F2FD"
+                android:padding="10dp"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/widget_category_name_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Categoria"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_value_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="R$ 0 / R$ 0"
+                    android:textSize="9sp"
+                    android:textColor="#666666"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_percentage_2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Card Categoria 3 -->
+            <LinearLayout
+                android:id="@+id/widget_category_card_3"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#E3F2FD"
+                android:padding="10dp"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/widget_category_name_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Categoria"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_value_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="R$ 0 / R$ 0"
+                    android:textSize="9sp"
+                    android:textColor="#666666"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_percentage_3"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Card Categoria 4 -->
+            <LinearLayout
+                android:id="@+id/widget_category_card_4"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#E3F2FD"
+                android:padding="10dp"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/widget_category_name_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Categoria"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_value_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="R$ 0 / R$ 0"
+                    android:textSize="9sp"
+                    android:textColor="#666666"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_percentage_4"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:gravity="center" />
+            </LinearLayout>
+
+            <!-- Card Categoria 5 -->
+            <LinearLayout
+                android:id="@+id/widget_category_card_5"
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#E3F2FD"
+                android:padding="10dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/widget_category_name_5"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Categoria"
+                    android:textSize="11sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_value_5"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="R$ 0 / R$ 0"
+                    android:textSize="9sp"
+                    android:textColor="#666666"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/widget_category_percentage_5"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="#1976D2"
+                    android:gravity="center" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </HorizontalScrollView>
+
+</LinearLayout>
+

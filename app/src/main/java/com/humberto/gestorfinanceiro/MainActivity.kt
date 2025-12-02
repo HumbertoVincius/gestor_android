@@ -24,7 +24,7 @@ import com.humberto.gestorfinanceiro.data.settings.SettingsManager
 import com.humberto.gestorfinanceiro.ui.categories.CategoriesScreen
 import com.humberto.gestorfinanceiro.ui.chat.ChatBottomSheet
 import com.humberto.gestorfinanceiro.ui.home.DebugScreen
-import com.humberto.gestorfinanceiro.ui.home.HomeScreen
+import com.humberto.gestorfinanceiro.ui.home.ExpensesScreen
 import com.humberto.gestorfinanceiro.ui.metas.MetasScreen
 import com.humberto.gestorfinanceiro.ui.navigation.Screen
 import com.humberto.gestorfinanceiro.ui.theme.GestorFinanceiroTheme
@@ -90,21 +90,53 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Inicializar SettingsManager
-        SettingsManager.initialize(this)
-        
-        // Criar canal de notificação
-        NotificationHelper.createNotificationChannel(this)
-        
-        checkPermissions()
-        
-        setContent {
-            GestorFinanceiroTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    MainNavigation()
+        try {
+            // Inicializar SettingsManager
+            SettingsManager.initialize(this)
+            
+            // Criar canal de notificação
+            NotificationHelper.createNotificationChannel(this)
+            
+            checkPermissions()
+            
+            setContent {
+                GestorFinanceiroTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        MainNavigation()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Erro fatal no onCreate", e)
+            // Mostrar mensagem de erro ao usuário
+            setContent {
+                GestorFinanceiroTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "Erro ao iniciar o aplicativo",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Por favor, reinicie o aplicativo",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -149,19 +181,37 @@ fun MainNavigation() {
     var expandedCategory by remember { mutableStateOf<String?>(null) }
     var showChatBottomSheet by remember { mutableStateOf(false) }
     
-    // Processar deep link do intent
+    // Processar deep link do intent apenas uma vez na inicialização
     val context = androidx.compose.ui.platform.LocalContext.current
-    val activity = context as? MainActivity
+    val activity = remember { context as? MainActivity }
     
-    // Processar intent inicial e novos intents
-    LaunchedEffect(activity?.intent) {
-        val intent = activity?.intent
-        val data = intent?.data
-        if (data?.scheme == "app" && data.host == "home") {
-            val categoryParam = data.getQueryParameter("category")
-            if (categoryParam != null && categoryParam.isNotBlank()) {
-                selectedScreen = Screen.METAS // Navegar para tela Home (MetasScreen)
-                expandedCategory = categoryParam
+    // Processar intent inicial apenas uma vez
+    LaunchedEffect(Unit) {
+        activity?.let { act ->
+            try {
+                val intent = act.intent
+                val data = intent?.data
+                
+                // Processar deep link
+                if (data?.scheme == "app" && data.host == "home") {
+                    val categoryParam = data.getQueryParameter("category")
+                    if (categoryParam != null && categoryParam.isNotBlank()) {
+                        selectedScreen = Screen.METAS // Navegar para tela Metas
+                        expandedCategory = categoryParam
+                    }
+                }
+                
+                // Processar extra do widget
+                val screenExtra = intent?.getStringExtra("screen")
+                if (screenExtra != null) {
+                    try {
+                        selectedScreen = Screen.valueOf(screenExtra)
+                    } catch (e: Exception) {
+                        android.util.Log.e("MainNavigation", "Tela inválida: $screenExtra", e)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainNavigation", "Erro ao processar intent", e)
             }
         }
     }
@@ -226,7 +276,7 @@ fun MainNavigation() {
                 .padding(paddingValues)
         ) {
             when (selectedScreen) {
-                Screen.HOME -> HomeScreen(expandedCategory = expandedCategory)
+                Screen.HOME -> ExpensesScreen(expandedCategory = expandedCategory)
                 Screen.METAS -> MetasScreen(expandedCategory = expandedCategory)
                 Screen.CATEGORIES -> CategoriesScreen()
                 Screen.DEBUG -> DebugScreen()

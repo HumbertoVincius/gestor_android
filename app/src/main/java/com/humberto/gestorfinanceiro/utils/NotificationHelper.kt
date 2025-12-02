@@ -88,7 +88,7 @@ object NotificationHelper {
         
         android.util.Log.d("NotificationHelper", "Texto da notificação: $notificationText")
 
-        // Intent para abrir tela Home (MetasScreen) com categoria expandida
+        // Intent para abrir tela Metas com categoria expandida
         val intent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = Uri.parse("app://home?category=${Uri.encode(categoria ?: "")}")
@@ -146,7 +146,7 @@ object NotificationHelper {
         val spentText = String.format("R$ %.2f", spent)
         val goalText = String.format("R$ %.2f", goal)
         
-        // Intent para abrir tela Home (MetasScreen) com categoria expandida
+        // Intent para abrir tela Metas com categoria expandida
         val intent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = Uri.parse("app://home?category=${Uri.encode(categoryName)}")

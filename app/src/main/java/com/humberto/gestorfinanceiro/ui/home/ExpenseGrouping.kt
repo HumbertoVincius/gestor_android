@@ -41,10 +41,19 @@ fun normalizeText(text: String): String {
 }
 
 fun formatCurrency(value: Double): String {
-    val formatter = java.text.DecimalFormat("#,##0.00", java.text.DecimalFormatSymbols(Locale("pt", "BR")))
-    formatter.decimalFormatSymbols = java.text.DecimalFormatSymbols(Locale("pt", "BR")).apply {
-        decimalSeparator = ','
-        groupingSeparator = '.'
+    return try {
+        // Proteção contra valores inválidos
+        val safeValue = when {
+            value.isNaN() || value.isInfinite() -> 0.0
+            else -> value
+        }
+        val formatter = java.text.DecimalFormat("#,##0.00", java.text.DecimalFormatSymbols(Locale("pt", "BR")))
+        formatter.decimalFormatSymbols = java.text.DecimalFormatSymbols(Locale("pt", "BR")).apply {
+            decimalSeparator = ','
+            groupingSeparator = '.'
+        }
+        "R$ ${formatter.format(safeValue)}"
+    } catch (e: Exception) {
+        "R$ 0,00"
     }
-    return "R$ ${formatter.format(value)}"
 }

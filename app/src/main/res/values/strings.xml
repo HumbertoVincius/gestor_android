@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Gestor Financeiro</string>
+    <string name="widget_metas_description">Exibe resumo das metas financeiras do mês atual</string>
 </resources>

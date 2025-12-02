@@ -50,7 +50,7 @@ import java.util.*
 import java.util.Locale
 import java.util.UUID
 
-private const val TAG = "HomeScreen"
+private const val TAG = "ExpensesScreen"
 
 data class SelectedDate(val year: Int, val month: Int, val day: Int)
 
@@ -64,7 +64,7 @@ fun getMonthYearString(month: Int, year: Int): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(expandedCategory: String? = null) {
+fun ExpensesScreen(expandedCategory: String? = null) {
     val calendar = Calendar.getInstance()
     var selectedMonth by remember { mutableIntStateOf(calendar.get(Calendar.MONTH) + 1) }
     var selectedYear by remember { mutableIntStateOf(calendar.get(Calendar.YEAR)) }
@@ -304,7 +304,7 @@ fun HomeScreen(expandedCategory: String? = null) {
                     modifier = Modifier.fillMaxSize()
                 ) {
                     groupedExpenses.forEach { (date, dayExpenses) ->
-                        item(key = date) {
+                        item(key = "header_$date") {
                             DayHeader(
                                 date = date,
                                 transactionCount = dayExpenses.size,
@@ -312,7 +312,13 @@ fun HomeScreen(expandedCategory: String? = null) {
                                 modifier = Modifier.padding(vertical = 8.dp)
                             )
                         }
-                        items(dayExpenses, key = { it.idDespesa ?: UUID.randomUUID().toString() }) { expense ->
+                        items(
+                            items = dayExpenses,
+                            key = { expense ->
+                                // Usar uma key estável baseada em múltiplos campos para evitar crashes
+                                expense.idDespesa ?: "${expense.dataDespesa}_${expense.valor}_${expense.local}_${expense.hashCode()}"
+                            }
+                        ) { expense ->
                             ExpenseListItem(
                                 expense = expense,
                                 onEditClick = {

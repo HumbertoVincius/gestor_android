@@ -1077,6 +1077,58 @@ class SupabaseRepository(
     }
     
     /**
+     * Copia todas as metas do mês anterior para o mês atual
+     */
+    suspend fun copyGoalsFromPreviousMonth(currentMonth: Int, currentYear: Int): Int = withContext(Dispatchers.IO) {
+        try {
+            // Calcular mês anterior
+            val previousMonth = if (currentMonth == 1) 12 else currentMonth - 1
+            val previousYear = if (currentMonth == 1) currentYear - 1 else currentYear
+            
+            // Buscar metas do mês anterior
+            val previousGoals = getGoalsByMonthCached(previousMonth, previousYear, false)
+            
+            if (previousGoals.isEmpty()) {
+                Log.d(TAG, "Nenhuma meta encontrada no mês anterior")
+                return@withContext 0
+            }
+            
+            var copiedCount = 0
+            
+            // Copiar cada meta
+            previousGoals.forEach { previousGoal ->
+                val valorMeta = previousGoal.valorMeta ?: return@forEach
+                val idCategoria = previousGoal.idCategoria ?: return@forEach
+                
+                try {
+                    // Verificar se já existe meta para o mês atual
+                    val existingGoal = getGoalByCategory(idCategoria, currentMonth, currentYear)
+                    
+                    if (existingGoal == null) {
+                        // Criar nova meta copiando do mês anterior
+                        upsertGoal(idCategoria, valorMeta, currentMonth, currentYear)
+                        copiedCount++
+                        Log.d(TAG, "Meta copiada: ${previousGoal.nomeCategoria} - R$ $valorMeta")
+                    } else {
+                        Log.d(TAG, "Meta já existe para ${previousGoal.nomeCategoria}, pulando...")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erro ao copiar meta de ${previousGoal.nomeCategoria}", e)
+                }
+            }
+            
+            // Invalidar cache para forçar atualização
+            com.humberto.gestorfinanceiro.data.cache.DataCache.invalidateGoals()
+            
+            Log.d(TAG, "Total de metas copiadas: $copiedCount")
+            copiedCount
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao copiar metas do mês anterior", e)
+            throw e
+        }
+    }
+    
+    /**
      * Busca categorias usando cache
      */
     suspend fun getCategoriesListCached(forceRefresh: Boolean = false): List<Category> {
